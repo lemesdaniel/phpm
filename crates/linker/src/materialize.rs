@@ -34,10 +34,16 @@ pub fn materialize_package(store_pkg: &Path, dest: &Path, mode: LinkMode) -> Res
                 if links_match(entry.path(), &target)? {
                     continue;
                 }
-                if target.exists() {
+                // remove any existing entry (regular file or dangling symlink) before linking
+                if fs::symlink_metadata(&target).is_ok() {
                     fs::remove_file(&target)?;
                 }
-                fs::hard_link(entry.path(), &target)?;
+                if let Err(e) = fs::hard_link(entry.path(), &target) {
+                    // cross-volume / hard-link-unsupported (Windows different volume,
+                    // bind mounts) → degrade to a copy for this file; propagate the
+                    // original error only if the copy also fails.
+                    fs::copy(entry.path(), &target).map_err(|_| LinkError::Io(e))?;
+                }
             }
             LinkMode::Copy => {
                 fs::copy(entry.path(), &target)?;
@@ -52,11 +58,14 @@ pub fn materialize_package(store_pkg: &Path, dest: &Path, mode: LinkMode) -> Res
 #[cfg(unix)]
 fn links_match(source: &Path, target: &Path) -> Result<bool, LinkError> {
     use std::os::unix::fs::MetadataExt;
-    if !target.exists() {
+    let t = match fs::symlink_metadata(target) {
+        Ok(m) => m,
+        Err(_) => return Ok(false),
+    };
+    if t.file_type().is_symlink() {
         return Ok(false);
     }
     let s = fs::metadata(source)?;
-    let t = fs::metadata(target)?;
     Ok(s.dev() == t.dev() && s.ino() == t.ino())
 }
 

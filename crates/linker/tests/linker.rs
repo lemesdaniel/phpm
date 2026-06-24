@@ -48,6 +48,24 @@ fn materialize_is_idempotent_skips_correct_links() {
 }
 
 #[test]
+#[cfg(unix)]
+fn materialize_relinks_when_target_has_different_inode() {
+    let src = TempDir::new().unwrap();
+    let dst_root = TempDir::new().unwrap();
+    fake_pkg(src.path());
+    let dst = dst_root.path().join("acme/pkg");
+    // pre-existing target with different content/inode (simulates an upgrade)
+    fs::create_dir_all(dst.join("src")).unwrap();
+    fs::write(dst.join("src/A.php"), b"OLD").unwrap();
+    fs::write(dst.join("composer.json"), b"OLD").unwrap();
+
+    let n = materialize_package(src.path(), &dst, LinkMode::HardLink).unwrap();
+    assert_eq!(n, 2, "both files re-linked");
+    assert_eq!(ino(&src.path().join("src/A.php")), ino(&dst.join("src/A.php")));
+    assert_eq!(fs::read(dst.join("src/A.php")).unwrap(), b"<?php class A {}");
+}
+
+#[test]
 fn materialize_copy_mode_duplicates_content() {
     let src = TempDir::new().unwrap();
     let dst_root = TempDir::new().unwrap();

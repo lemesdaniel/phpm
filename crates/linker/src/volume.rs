@@ -21,6 +21,7 @@ pub fn same_volume(a: &Path, b: &Path) -> io::Result<bool> {
 /// we report "same volume" and rely on a copy fallback when a hard link actually fails.
 #[cfg(windows)]
 pub fn same_volume(_a: &Path, _b: &Path) -> io::Result<bool> {
+    // TODO(M3-hardening): detect the real volume serial on Windows instead of assuming same volume.
     Ok(true)
 }
 

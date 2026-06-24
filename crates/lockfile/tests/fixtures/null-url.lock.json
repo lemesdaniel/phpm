@@ -1,0 +1,8 @@
+{
+  "content-hash": "abc",
+  "packages": [
+    { "name": "acme/no-url", "version": "1.0.0", "dist": { "type": "zip", "url": null, "reference": "r1", "shasum": "" } },
+    { "name": "acme/with-url", "version": "1.0.0", "dist": { "type": "zip", "url": "https://x/y.zip", "reference": "r2", "shasum": "deadbeef" } }
+  ],
+  "packages-dev": []
+}

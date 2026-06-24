@@ -48,8 +48,8 @@ pub struct Autoload {
     pub classmap: Vec<String>,
 }
 
-/// `bin` pode ser string única ou lista → normaliza p/ Vec.
-/// Tolera `null` explícito (vira Vec vazio).
+/// `bin` can be a single string or a list → normalizes to Vec.
+/// Tolerates explicit `null` (becomes an empty Vec).
 fn string_or_vec<'de, D>(d: D) -> Result<Vec<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -58,8 +58,8 @@ where
     Ok(opt.map(OneOrMany::into_vec).unwrap_or_default())
 }
 
-/// psr-4 / psr-0 / scripts: cada valor é string OU lista → normaliza p/ Vec.
-/// Tolera `null` explícito no mapa (vira BTreeMap vazio).
+/// psr-4 / psr-0 / scripts: each value is a string OR a list → normalizes to Vec.
+/// Tolerates explicit `null` on the map (becomes an empty BTreeMap).
 fn one_or_many_map<'de, D>(d: D) -> Result<BTreeMap<String, Vec<String>>, D::Error>
 where
     D: serde::Deserializer<'de>,

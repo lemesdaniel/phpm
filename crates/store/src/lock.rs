@@ -3,8 +3,8 @@ use fs4::fs_std::FileExt;
 use std::fs::{File, OpenOptions};
 use std::path::PathBuf;
 
-/// Guarda RAII de um lock de pacote. Ao dropar, libera o lock (flock também é
-/// liberado automaticamente pelo SO se o processo morrer — sem lock órfão).
+/// RAII guard for a package lock. When dropped, releases the lock (flock is also
+/// released automatically by the OS if the process dies — no orphan lock).
 pub struct PackageLock {
     _file: File,
 }
@@ -30,23 +30,23 @@ impl Store {
             .open(path)?)
     }
 
-    /// Lock compartilhado — múltiplos leitores/linkers simultâneos. Bloqueia.
+    /// Shared lock — multiple simultaneous readers/linkers. Blocking.
     pub fn lock_shared(&self, coords: &PackageCoords) -> Result<PackageLock, StoreError> {
         let file = self.open_lock_file(coords)?;
         FileExt::lock_shared(&file)?;
         Ok(PackageLock { _file: file })
     }
 
-    /// Lock exclusivo — para escrita no store e para o GC. Bloqueia.
-    // M5 adicionará try_lock_exclusive para o GC pular pacotes em uso.
+    /// Exclusive lock — for writing to the store and for GC. Blocking.
+    // M5 will add try_lock_exclusive so GC can skip packages currently in use.
     pub fn lock_exclusive(&self, coords: &PackageCoords) -> Result<PackageLock, StoreError> {
         let file = self.open_lock_file(coords)?;
         FileExt::lock_exclusive(&file)?;
         Ok(PackageLock { _file: file })
     }
 
-    /// Tenta o lock compartilhado sem bloquear.
-    /// Ok(None) = exclusive ativo (contenção); Err = falha real de io.
+    /// Tries to acquire the shared lock without blocking.
+    /// Ok(None) = exclusive lock active (contention); Err = real I/O failure.
     pub fn try_lock_shared(
         &self,
         coords: &PackageCoords,

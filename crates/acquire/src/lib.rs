@@ -1,4 +1,4 @@
-//! Aquisição de pacotes: baixa dist ou clona git source para o store global.
+//! Package acquisition: downloads dist or clones git source into the global store.
 
 pub mod dist;
 mod fetch;
@@ -15,13 +15,13 @@ use store::{PackageCoords, Store};
 pub enum AcquireError {
     #[error("HTTP: {0}")]
     Http(String),
-    #[error("shasum não confere: esperado {expected}, obtido {actual}")]
+    #[error("shasum mismatch: expected {expected}, got {actual}")]
     Shasum { expected: String, actual: String },
-    #[error("zip inválido: {0}")]
+    #[error("invalid zip: {0}")]
     Zip(String),
-    #[error("git falhou: {0}")]
+    #[error("git failed: {0}")]
     Git(String),
-    #[error("pacote {0} não tem dist nem source utilizáveis")]
+    #[error("package {0} has no usable dist or source")]
     NoSource(String),
     #[error("I/O: {0}")]
     Io(#[from] std::io::Error),
@@ -29,10 +29,10 @@ pub enum AcquireError {
     Store(#[from] store::StoreError),
 }
 
-/// Garante que `pkg` esteja materializado no store, íntegro.
-/// - Pacotes de plataforma (sem barra no nome, ex. "php") são ignorados.
-/// - Adquire sob lock EXCLUSIVO (decisão Q8): lock → checa has()+verify() →
-///   se íntegro, pula; senão baixa o dist (se houver url) ou clona o git source.
+/// Ensures `pkg` is materialized in the store and intact.
+/// - Platform packages (no slash in name, e.g. "php") are skipped.
+/// - Acquires under an EXCLUSIVE lock (decision Q8): lock → check has()+verify() →
+///   if intact, skip; otherwise download the dist (if url present) or clone the git source.
 pub fn acquire_package(
     store: &Store,
     fetcher: &dyn Fetcher,
@@ -40,18 +40,18 @@ pub fn acquire_package(
 ) -> Result<(), AcquireError> {
     let coords = match PackageCoords::from_name(&pkg.name, &pkg.version) {
         Some(c) => c,
-        None => return Ok(()), // plataforma (php, ext-*) → nada a adquirir
+        None => return Ok(()), // platform package (php, ext-*) → nothing to acquire
     };
 
-    // lock exclusivo ANTES de checar/escrever — evita TOCTOU entre installs paralelos.
+    // Exclusive lock BEFORE checking/writing — prevents TOCTOU between parallel installs.
     let _lock = store.lock_exclusive(&coords)?;
 
     if store.has(&coords) {
         if store.verify(&coords).is_ok() {
             return Ok(());
         }
-        // presente mas corrompido (sha diverge / meta inconsistente) →
-        // remove para permitir re-materialização limpa (sob o lock exclusivo).
+        // present but corrupted (sha mismatch / inconsistent metadata) →
+        // remove to allow clean re-materialization (under the exclusive lock).
         store.remove_package(&coords)?;
     }
 

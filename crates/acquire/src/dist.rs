@@ -2,9 +2,9 @@ use crate::{shasum, zipx, AcquireError, Fetcher};
 use lockfile::Dist;
 use store::{PackageCoords, Store};
 
-/// Baixa o dist (zip), verifica o shasum, extrai (strip do dir-raiz) para um
-/// diretório temporário e escreve no store de forma atômica.
-/// NOTA(M3): a url do dist não tem allowlist de scheme/host — possível SSRF se PHPM rodar em nuvem. Allowlist fica p/ M3.
+/// Downloads the dist (zip), verifies the shasum, extracts (stripping the root directory)
+/// into a temporary directory, and writes to the store atomically.
+/// NOTE(M3): the dist url has no scheme/host allowlist — potential SSRF if PHPM runs in the cloud. Allowlist deferred to M3.
 pub fn acquire_dist(
     store: &Store,
     fetcher: &dyn Fetcher,
@@ -20,7 +20,7 @@ pub fn acquire_dist(
 
     if !dist.dist_type.eq_ignore_ascii_case("zip") {
         return Err(AcquireError::Zip(format!(
-            "tipo de dist não suportado: '{}' (apenas zip no M2)",
+            "unsupported dist type: '{}' (only zip in M2)",
             dist.dist_type
         )));
     }

@@ -4,7 +4,7 @@ use std::io::Write;
 use std::process::Command;
 use store::{PackageCoords, Store};
 
-/// Fetcher de teste que devolve bytes fixos, sem rede.
+/// Test fetcher that returns fixed bytes, without network access.
 struct StaticFetcher {
     bytes: Vec<u8>,
 }
@@ -23,7 +23,7 @@ fn static_fetcher_returns_bytes() {
     assert_eq!(f.fetch("http://x").unwrap(), vec![1, 2, 3]);
 }
 
-/// Monta um zip em memória no formato Packagist: tudo sob um único dir-raiz.
+/// Builds an in-memory zip in Packagist format: everything under a single root directory.
 fn make_composer_zip() -> Vec<u8> {
     let mut buf = Vec::new();
     {
@@ -81,7 +81,6 @@ fn extract_rejects_symlink_entry() {
         let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
         let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default();
         zip.add_directory("pkg-root/", opts).unwrap();
-        // alvo do symlink como conteúdo (formato zip de symlink unix)
         zip.add_symlink("pkg-root/link", "../../secret", opts)
             .unwrap();
         zip.finish().unwrap();
@@ -97,7 +96,7 @@ fn shasum_ok_when_matches_and_skips_when_empty() {
     // sha1("hello world") = 2aae6c35c94fcfb415dbe95f408b9ce91ee846ed
     let sha = "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed";
     acquire::shasum::verify_sha1(bytes, sha).unwrap();
-    // shasum vazio → pula (Ok)
+    // empty shasum → skip (Ok)
     acquire::shasum::verify_sha1(bytes, "").unwrap();
 }
 
@@ -138,7 +137,7 @@ fn acquire_dist_writes_package_to_store() {
 }
 
 #[test]
-#[ignore = "rede: rode com --ignored quando quiser validar download real"]
+#[ignore = "network: run with --ignored when you want to validate a real download"]
 fn http_fetcher_downloads_real_dist() {
     use acquire::Fetcher;
     use acquire::HttpFetcher;
@@ -146,7 +145,7 @@ fn http_fetcher_downloads_real_dist() {
         "https://api.github.com/repos/php-fig/log/zipball/79dff0b268932c640297f5208d6298f71855c03e";
     let fetcher = HttpFetcher::new().unwrap();
     let bytes = fetcher.fetch(url).unwrap();
-    assert!(bytes.len() > 1000, "deve baixar um zip não-trivial");
+    assert!(bytes.len() > 1000, "should download a non-trivial zip");
     assert_eq!(&bytes[0..2], b"PK");
 }
 
@@ -188,7 +187,7 @@ fn extract_without_common_root_is_flat() {
     assert!(tmp.path().join("b/y.php").exists());
 }
 
-/// Cria um repositório git local, commita 1 arquivo, devolve (dir, sha).
+/// Creates a local git repository, commits 1 file, and returns (dir, sha).
 fn make_git_repo() -> (tempfile::TempDir, String) {
     let dir = tempfile::TempDir::new().unwrap();
     let run = |args: &[&str]| {
@@ -350,11 +349,11 @@ fn acquire_package_skips_when_already_in_store_intact() {
         &pkg,
     )
     .unwrap();
-    // segunda vez: fetcher que PANICA se chamado — prova que pulou o download
+    // second call: fetcher that PANICs if called — proves the download was skipped
     struct PanicFetcher;
     impl acquire::Fetcher for PanicFetcher {
         fn fetch(&self, _u: &str) -> Result<Vec<u8>, acquire::AcquireError> {
-            panic!("não deveria baixar — pacote já está íntegro no store");
+            panic!("should not download — package is already intact in the store");
         }
     }
     acquire::acquire_package(&store, &PanicFetcher, &pkg).unwrap();
@@ -401,14 +400,13 @@ fn acquire_package_repairs_corrupt_store_entry() {
     )
     .unwrap();
     let coords = PackageCoords::from_name("acme/pkg", "1.0.0").unwrap();
-    // corrompe um arquivo (store é read-only → reabilita escrita primeiro)
+    // corrupt a file (store is read-only → re-enable write permissions first)
     let f = store.package_path(&coords).join("composer.json");
     let mut perms = std::fs::metadata(&f).unwrap().permissions();
     perms.set_mode(0o644);
     std::fs::set_permissions(&f, perms).unwrap();
     std::fs::write(&f, b"CORROMPIDO").unwrap();
     assert!(store.verify(&coords).is_err());
-    // re-adquire: deve curar
     acquire::acquire_package(
         &store,
         &StaticFetcher {

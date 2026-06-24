@@ -1,4 +1,4 @@
-//! Parsing de composer.lock e composer.json. Sem I/O.
+//! Parsing of composer.lock and composer.json. No I/O.
 
 mod json;
 mod lock;
@@ -8,7 +8,7 @@ pub use lock::{ComposerLock, Dist, LockedPackage, Source};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LockError {
-    #[error("JSON inválido: {0}")]
+    #[error("invalid JSON: {0}")]
     Json(#[from] serde_json::Error),
 }
 

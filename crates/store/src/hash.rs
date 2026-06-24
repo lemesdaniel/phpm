@@ -3,12 +3,15 @@ use std::io;
 use std::path::Path;
 use walkdir::WalkDir;
 
-/// Hash determinístico do conteúdo de um diretório.
-/// Ordena os arquivos pelo caminho relativo (com `/` normalizado) e mistura,
-/// para cada arquivo: caminho relativo, tamanho e bytes. Independente da
-/// ordem de criação no FS e da plataforma (separador normalizado).
-/// Assume nomes de arquivo UTF-8 (pacotes Composer usam ASCII na prática);
-/// não aplica normalização Unicode NFC/NFD — fora do escopo M1.
+/// Deterministic hash of a directory's contents: independent of FS creation
+/// order and platform (paths sorted, `/`-normalized).
+///
+/// Each file contributes a length-prefixed relative path then length-prefixed
+/// bytes; the length prefixes prevent collisions between different boundary
+/// splits (e.g. "ab"+"c" vs "a"+"bc").
+///
+/// Assumes UTF-8 file names (Composer packages are ASCII in practice); does not
+/// apply NFC/NFD Unicode normalization — out of scope for M1.
 pub fn sha256_tree(root: &Path) -> io::Result<String> {
     let mut files: Vec<(String, std::path::PathBuf)> = Vec::new();
     for entry in WalkDir::new(root).follow_links(false) {
@@ -21,7 +24,7 @@ pub fn sha256_tree(root: &Path) -> io::Result<String> {
             .strip_prefix(root)
             .map_err(io::Error::other)?
             .to_str()
-            .ok_or_else(|| io::Error::other("caminho não-UTF-8 no pacote"))?
+            .ok_or_else(|| io::Error::other("non-UTF-8 path in package"))?
             .replace('\\', "/");
         files.push((rel, entry.path().to_path_buf()));
     }

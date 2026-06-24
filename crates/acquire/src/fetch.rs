@@ -1,11 +1,11 @@
 use crate::AcquireError;
 
-/// Abstrai a rede para testabilidade. Produção usa HttpFetcher; testes injetam bytes.
+/// Abstracts the network for testability. Production uses HttpFetcher; tests inject bytes.
 pub trait Fetcher {
     fn fetch(&self, url: &str) -> Result<Vec<u8>, AcquireError>;
 }
 
-/// Fetcher HTTP real via reqwest blocking. Envia User-Agent (Packagist exige).
+/// Real HTTP fetcher via reqwest blocking. Sends User-Agent (required by Packagist).
 pub struct HttpFetcher {
     client: reqwest::blocking::Client,
 }

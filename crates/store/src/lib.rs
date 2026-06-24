@@ -1,4 +1,4 @@
-//! Store global do PHPM: layout, integridade, atomicidade e locks.
+//! Global store for PHPM: layout, integrity, atomicity, and locks.
 
 mod atomic;
 mod hash;
@@ -13,11 +13,11 @@ use std::path::{Path, PathBuf};
 pub enum StoreError {
     #[error("I/O: {0}")]
     Io(#[from] std::io::Error),
-    #[error("pacote já existe no store: {0}")]
+    #[error("package already exists in store: {0}")]
     AlreadyExists(String),
-    #[error("falha de integridade: esperado {expected}, obtido {actual}")]
+    #[error("integrity failure: expected {expected}, got {actual}")]
     Integrity { expected: String, actual: String },
-    #[error("metadados ausentes para {0}")]
+    #[error("missing metadata for {0}")]
     MissingMeta(String),
     #[error("JSON: {0}")]
     Json(#[from] serde_json::Error),
@@ -31,8 +31,8 @@ pub struct PackageCoords {
 }
 
 impl PackageCoords {
-    /// Converte um nome Composer "vendor/package" + versão em coords.
-    /// Retorna None para nomes de plataforma (sem barra, ex. "php", "ext-json").
+    /// Converts a Composer "vendor/package" name + version into coords.
+    /// Returns None for platform names (no slash, e.g. "php", "ext-json").
     pub fn from_name(name: &str, version: &str) -> Option<Self> {
         let (vendor, package) = name.split_once('/')?;
         if vendor.is_empty() || package.is_empty() || package.contains('/') {

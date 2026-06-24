@@ -2,9 +2,9 @@ use crate::AcquireError;
 use std::io::{Cursor, Read};
 use std::path::Path;
 
-/// Extrai um zip (bytes) para `dest`, removendo o único diretório-raiz que os
-/// archives do Composer/Packagist embrulham (ex.: `vendor-pkg-<hash>/`).
-/// Se os arquivos NÃO compartilham um único dir-raiz, extrai sem strip.
+/// Extracts a zip (bytes) into `dest`, stripping the single root directory that
+/// Composer/Packagist archives wrap their contents in (e.g. `vendor-pkg-<hash>/`).
+/// If the files do NOT share a single root directory, extracts without stripping.
 pub fn extract_strip_root(zip_bytes: &[u8], dest: &Path) -> Result<(), AcquireError> {
     let mut archive = zip::ZipArchive::new(Cursor::new(zip_bytes))
         .map_err(|e| AcquireError::Zip(e.to_string()))?;
@@ -16,21 +16,21 @@ pub fn extract_strip_root(zip_bytes: &[u8], dest: &Path) -> Result<(), AcquireEr
             .by_index(i)
             .map_err(|e| AcquireError::Zip(e.to_string()))?;
         let name = file.name().to_string();
-        // checagem nativa de path traversal / absoluto (nível de componente)
+        // native check for path traversal / absolute paths (component level)
         if file.enclosed_name().is_none() {
-            return Err(AcquireError::Zip(format!("entry insegura: {name}")));
+            return Err(AcquireError::Zip(format!("unsafe entry: {name}")));
         }
-        // symlinks em archive: rejeita (M2). zip armazena o alvo como conteúdo;
-        // materializar como arquivo regular corromperia o pacote.
+        // symlinks in archive: rejected (M2). zip stores the target as file content;
+        // materializing it as a regular file would corrupt the package.
         if file.is_symlink() {
-            return Err(AcquireError::Zip(format!("symlink rejeitada: {name}")));
+            return Err(AcquireError::Zip(format!("symlink rejected: {name}")));
         }
         let rel = match &root {
             Some(prefix) => name.strip_prefix(prefix.as_str()).unwrap_or(&name),
             None => name.as_str(),
         };
         if rel.is_empty() {
-            continue; // a própria entrada do dir-raiz
+            continue; // the root directory entry itself
         }
         let out = dest.join(rel);
         if file.is_dir() || name.ends_with('/') {
@@ -49,8 +49,8 @@ pub fn extract_strip_root(zip_bytes: &[u8], dest: &Path) -> Result<(), AcquireEr
     Ok(())
 }
 
-/// Retorna `Some("<root>/")` se TODAS as entradas começam com o mesmo primeiro
-/// componente; senão `None` (não faz strip).
+/// Returns `Some("<root>/")` if ALL entries start with the same first
+/// component; otherwise `None` (no stripping performed).
 fn common_root<R: Read + std::io::Seek>(
     archive: &mut zip::ZipArchive<R>,
 ) -> Result<Option<String>, AcquireError> {

@@ -4,7 +4,7 @@ const APP: &str = include_str!("fixtures/laravel-ish.composer.json");
 
 #[test]
 fn parses_require_and_dev() {
-    let cj = parse_json(APP).expect("deve parsear");
+    let cj = parse_json(APP).expect("should parse");
     assert_eq!(
         cj.require.get("laravel/framework").map(String::as_str),
         Some("^11.0")
@@ -18,7 +18,7 @@ fn parses_require_and_dev() {
 
 #[test]
 fn parses_psr4_string_and_array() {
-    let cj = parse_json(APP).expect("deve parsear");
+    let cj = parse_json(APP).expect("should parse");
     let psr4 = &cj.autoload.psr4;
     assert_eq!(psr4.get("App\\").unwrap().as_slice(), &["app/".to_string()]);
     assert_eq!(
@@ -32,18 +32,18 @@ fn parses_psr4_string_and_array() {
 
 #[test]
 fn parses_files_classmap_scripts_bin() {
-    let cj = parse_json(APP).expect("deve parsear");
+    let cj = parse_json(APP).expect("should parse");
     assert_eq!(cj.autoload.files, vec!["app/helpers.php".to_string()]);
     assert_eq!(cj.autoload.classmap, vec!["app/Legacy".to_string()]);
     assert_eq!(cj.bin, vec!["bin/console".to_string()]);
-    let pad = cj.scripts.get("post-autoload-dump").expect("tem hook");
+    let pad = cj.scripts.get("post-autoload-dump").expect("has hook");
     assert_eq!(pad.len(), 2);
     assert_eq!(pad[1], "@php artisan package:discover --ansi");
 }
 
 #[test]
 fn tolerates_null_bin_and_scripts() {
-    let cj = parse_json(r#"{"bin": null, "scripts": null}"#).expect("null deve virar vazio");
+    let cj = parse_json(r#"{"bin": null, "scripts": null}"#).expect("null should become empty");
     assert!(cj.bin.is_empty());
     assert!(cj.scripts.is_empty());
 }
@@ -56,7 +56,7 @@ fn bin_accepts_single_string() {
 
 #[test]
 fn empty_object_is_all_defaults() {
-    let cj = parse_json("{}").expect("vazio ok");
+    let cj = parse_json("{}").expect("empty ok");
     assert!(cj.name.is_empty());
     assert!(cj.require.is_empty());
     assert!(cj.autoload.psr4.is_empty());

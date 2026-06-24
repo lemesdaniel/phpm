@@ -12,33 +12,31 @@ struct Meta {
 }
 
 impl Store {
-    /// Escreve um pacote já extraído (em `src_dir`) no store de forma atômica:
-    /// copia para um diretório temporário dentro do store, fsync, e move com
-    /// rename atômico para o destino final. Em seguida escreve o meta json.
-    /// Erra com AlreadyExists se o destino já existe (caller deve checar has()
-    /// sob lock antes de chamar).
+    /// Writes an already-extracted package (in `src_dir`) to the store atomically:
+    /// copies to a temporary directory inside the store, fsyncs, and moves with
+    /// an atomic rename to the final destination. Then writes the meta JSON.
+    /// Errors with AlreadyExists if the destination already exists (caller must check has()
+    /// under lock before calling).
     pub fn write_package(&self, coords: &PackageCoords, src_dir: &Path) -> Result<(), StoreError> {
         let dest = self.package_path(coords);
         if dest.is_dir() {
             if self.meta_path(coords).exists() {
-                // instalação completa → não reescreve
                 return Err(StoreError::AlreadyExists(format!(
                     "{}/{}@{}",
                     coords.vendor, coords.package, coords.version
                 )));
             }
-            // dir presente mas sem meta = instalação parcial (crash entre rename e meta).
-            // Remove o órfão e re-materializa. (Sob lock exclusivo quando Task 10 existir.)
-            // O dir pode estar read-only (crash pós-imutabilidade): restaura escrita antes de remover.
+            // dir present but no meta = partial install (crash between rename and meta write):
+            // remove the orphan and re-materialize. The dir may be read-only (crash after
+            // immutability was applied), so restore write access before removing.
             set_writable_recursive(&dest)?;
             fs::remove_dir_all(&dest)?;
         }
 
         let tmp_root = self.root_ref().join("tmp");
         fs::create_dir_all(&tmp_root)?;
-        // diretório temporário único por (coords) — sufixo determinístico simples;
-        // a unicidade real entre processos é garantida pelo lock exclusivo (Task 10).
-        // Unicidade entre processos garantida pelo lock exclusivo que o caller (acquire_package) segura desde M2.
+        // Deterministic per-(coords) suffix; cross-process uniqueness is guaranteed by the
+        // exclusive lock the caller (acquire_package) holds since M2.
         let staging = tmp_root.join(format!(
             "{}__{}__{}.staging",
             coords.vendor, coords.package, coords.version
@@ -49,21 +47,18 @@ impl Store {
         copy_tree(src_dir, &staging)?;
         fsync_tree(&staging)?;
 
-        // calcula integridade ANTES de aplicar read-only
+        // Compute integrity BEFORE applying read-only (chmod would otherwise block the read).
         let sha = sha256_tree(&staging).map_err(StoreError::Io)?;
 
-        // garante o diretório-pai do destino
         if let Some(parent) = dest.parent() {
             fs::create_dir_all(parent)?;
         }
-        // rename atômico staging → destino
         fs::rename(&staging, &dest)?;
 
-        // imutabilidade: store é read-only. Write em vendor/ (mesmo inode via
-        // hard link em M3) falha alto em vez de corromper o store global.
+        // immutability: store is read-only. A write in vendor/ (same inode via
+        // hard link in M3) fails loudly instead of silently corrupting the global store.
         set_read_only_recursive(&dest)?;
 
-        // meta json
         let meta = Meta {
             name: format!("{}/{}", coords.vendor, coords.package),
             version: coords.version.clone(),
@@ -78,9 +73,9 @@ impl Store {
         Ok(())
     }
 
-    /// Remove um pacote do store (dir + meta). Reabilita escrita antes (store é
-    /// read-only). Caller deve segurar o lock exclusivo. No-op se ausente.
-    /// Base para o GC (M5) e para reparo de entrada corrompida.
+    /// Removes a package from the store (dir + meta). Re-enables write access first (store is
+    /// read-only). Caller must hold the exclusive lock. No-op if absent.
+    /// Foundation for GC (M5) and for repairing a corrupted entry.
     pub fn remove_package(&self, coords: &PackageCoords) -> Result<(), StoreError> {
         let dest = self.package_path(coords);
         if dest.exists() {
@@ -111,8 +106,8 @@ fn copy_tree(src: &Path, dst: &Path) -> Result<(), StoreError> {
             }
             fs::copy(entry.path(), &target)?;
         }
-        // symlinks dentro de pacotes são raros; M1 ignora (follow_links=false não
-        // os segue e is_file()/is_dir() são falsos para eles). Tratar em M2 se surgir.
+        // symlinks inside packages are rare; M1 ignores them (follow_links=false does not
+        // follow them and is_file()/is_dir() return false for them). Handle in M2 if needed.
     }
     Ok(())
 }
@@ -138,7 +133,7 @@ fn set_read_only_recursive(root: &Path) -> Result<(), StoreError> {
             .map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
         let mut perms = meta.permissions();
         let mode = perms.mode();
-        // remove todos os bits de escrita, preserva leitura/execução
+        // remove all write bits, preserve read/execute
         perms.set_mode(mode & !0o222);
         fs::set_permissions(entry.path(), perms)?;
     }
@@ -161,11 +156,11 @@ fn set_read_only_recursive(root: &Path) -> Result<(), StoreError> {
 
 #[cfg(not(any(unix, windows)))]
 fn set_read_only_recursive(_root: &Path) -> Result<(), StoreError> {
-    Ok(()) // plataforma sem modelo de permissão conhecido — no-op
+    Ok(()) // platform with no known permission model — no-op
 }
 
-// Restaura só owner-write (0o200); se o pacote tinha group/other-write, esses bits não voltam.
-// Aceitável no M1 (self-heal owner-driven); revisar no M3 (hard-link).
+// Restores only owner-write (0o200); if the package had group/other-write bits, they are not restored.
+// Acceptable in M1 (owner-driven self-heal); revisit in M3 (hard-link).
 #[cfg(unix)]
 fn set_writable_recursive(root: &Path) -> Result<(), StoreError> {
     use std::os::unix::fs::PermissionsExt;

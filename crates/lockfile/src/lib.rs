@@ -1,8 +1,10 @@
 //! Parsing de composer.lock e composer.json. Sem I/O.
 
 mod lock;
+mod json;
 
 pub use lock::{ComposerLock, Dist, LockedPackage, Source};
+pub use json::{Autoload, ComposerJson};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LockError {
@@ -11,5 +13,9 @@ pub enum LockError {
 }
 
 pub fn parse_lock(input: &str) -> Result<ComposerLock, LockError> {
+    Ok(serde_json::from_str(input)?)
+}
+
+pub fn parse_json(input: &str) -> Result<ComposerJson, LockError> {
     Ok(serde_json::from_str(input)?)
 }

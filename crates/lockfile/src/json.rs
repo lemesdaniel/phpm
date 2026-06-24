@@ -30,7 +30,7 @@ pub struct ComposerJson {
     pub autoload: Autoload,
     #[serde(rename = "autoload-dev", default)]
     pub autoload_dev: Autoload,
-    #[serde(default, deserialize_with = "scripts_map")]
+    #[serde(default, deserialize_with = "one_or_many_map")]
     pub scripts: BTreeMap<String, Vec<String>>,
     #[serde(default, deserialize_with = "string_or_vec")]
     pub bin: Vec<String>,
@@ -38,9 +38,9 @@ pub struct ComposerJson {
 
 #[derive(Debug, Clone, PartialEq, Deserialize, Default)]
 pub struct Autoload {
-    #[serde(rename = "psr-4", default, deserialize_with = "psr_map")]
+    #[serde(rename = "psr-4", default, deserialize_with = "one_or_many_map")]
     pub psr4: BTreeMap<String, Vec<String>>,
-    #[serde(rename = "psr-0", default, deserialize_with = "psr_map")]
+    #[serde(rename = "psr-0", default, deserialize_with = "one_or_many_map")]
     pub psr0: BTreeMap<String, Vec<String>>,
     #[serde(default)]
     pub files: Vec<String>,
@@ -49,27 +49,25 @@ pub struct Autoload {
 }
 
 /// `bin` pode ser string única ou lista → normaliza p/ Vec.
+/// Tolera `null` explícito (vira Vec vazio).
 fn string_or_vec<'de, D>(d: D) -> Result<Vec<String>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    Ok(OneOrMany::deserialize(d)?.into_vec())
+    let opt: Option<OneOrMany> = Option::deserialize(d)?;
+    Ok(opt.map(OneOrMany::into_vec).unwrap_or_default())
 }
 
-/// psr-4 / psr-0: cada valor é string OU lista de strings → normaliza p/ Vec.
-fn psr_map<'de, D>(d: D) -> Result<BTreeMap<String, Vec<String>>, D::Error>
+/// psr-4 / psr-0 / scripts: cada valor é string OU lista → normaliza p/ Vec.
+/// Tolera `null` explícito no mapa (vira BTreeMap vazio).
+fn one_or_many_map<'de, D>(d: D) -> Result<BTreeMap<String, Vec<String>>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let raw: BTreeMap<String, OneOrMany> = BTreeMap::deserialize(d)?;
-    Ok(raw.into_iter().map(|(k, v)| (k, v.into_vec())).collect())
-}
-
-/// scripts: cada valor é string única OU lista → normaliza p/ Vec.
-fn scripts_map<'de, D>(d: D) -> Result<BTreeMap<String, Vec<String>>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let raw: BTreeMap<String, OneOrMany> = BTreeMap::deserialize(d)?;
-    Ok(raw.into_iter().map(|(k, v)| (k, v.into_vec())).collect())
+    let raw: Option<BTreeMap<String, OneOrMany>> = Option::deserialize(d)?;
+    Ok(raw
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(k, v)| (k, v.into_vec()))
+        .collect())
 }

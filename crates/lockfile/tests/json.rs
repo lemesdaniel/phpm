@@ -31,3 +31,24 @@ fn parses_files_classmap_scripts_bin() {
     assert_eq!(pad.len(), 2);
     assert_eq!(pad[1], "@php artisan package:discover --ansi");
 }
+
+#[test]
+fn tolerates_null_bin_and_scripts() {
+    let cj = parse_json(r#"{"bin": null, "scripts": null}"#).expect("null deve virar vazio");
+    assert!(cj.bin.is_empty());
+    assert!(cj.scripts.is_empty());
+}
+
+#[test]
+fn bin_accepts_single_string() {
+    let cj = parse_json(r#"{"bin": "bin/console"}"#).expect("bin string");
+    assert_eq!(cj.bin, vec!["bin/console".to_string()]);
+}
+
+#[test]
+fn empty_object_is_all_defaults() {
+    let cj = parse_json("{}").expect("vazio ok");
+    assert!(cj.name.is_empty());
+    assert!(cj.require.is_empty());
+    assert!(cj.autoload.psr4.is_empty());
+}

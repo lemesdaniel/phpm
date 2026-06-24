@@ -195,6 +195,10 @@ fn stored_files_are_read_only() {
     // escrita deve falhar
     let write_result = fs::OpenOptions::new().write(true).open(&logger);
     assert!(write_result.is_err(), "escrita em arquivo do store deveria falhar");
+
+    let src_dir = store.package_path(&coords()).join("src");
+    let dmode = fs::metadata(&src_dir).unwrap().permissions().mode();
+    assert_eq!(dmode & 0o222, 0, "diretório do store deve ser read-only, mode={:o}", dmode);
 }
 
 #[test]
@@ -209,4 +213,9 @@ fn write_package_reheals_readonly_orphan() {
     // segunda escrita deve auto-curar mesmo com dir read-only
     store.write_package(&coords(), fake_source().path()).unwrap();
     assert!(store.meta_path(&coords()).exists());
+
+    use std::os::unix::fs::PermissionsExt;
+    let logger = store.package_path(&coords()).join("src/Logger.php");
+    let mode = fs::metadata(&logger).unwrap().permissions().mode();
+    assert_eq!(mode & 0o222, 0, "pacote re-curado deve voltar read-only");
 }

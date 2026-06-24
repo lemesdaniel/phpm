@@ -140,6 +140,13 @@ fn set_read_only_recursive(root: &Path) -> Result<(), StoreError> {
     Ok(())
 }
 
+#[cfg(not(any(unix, windows)))]
+fn set_read_only_recursive(_root: &Path) -> Result<(), StoreError> {
+    Ok(()) // plataforma sem modelo de permissão conhecido — no-op
+}
+
+// Restaura só owner-write (0o200); se o pacote tinha group/other-write, esses bits não voltam.
+// Aceitável no M1 (self-heal owner-driven); revisar no M3 (hard-link).
 #[cfg(unix)]
 fn set_writable_recursive(root: &Path) -> Result<(), StoreError> {
     use std::os::unix::fs::PermissionsExt;
@@ -164,5 +171,10 @@ fn set_writable_recursive(root: &Path) -> Result<(), StoreError> {
         perms.set_readonly(false);
         fs::set_permissions(entry.path(), perms)?;
     }
+    Ok(())
+}
+
+#[cfg(not(any(unix, windows)))]
+fn set_writable_recursive(_root: &Path) -> Result<(), StoreError> {
     Ok(())
 }

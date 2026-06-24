@@ -1,5 +1,5 @@
 use acquire::{AcquireError, Fetcher};
-use lockfile::{Dist, Source};
+use lockfile::{Dist, LockedPackage, Source};
 use std::io::Write;
 use std::process::Command;
 use store::{PackageCoords, Store};
@@ -247,4 +247,68 @@ fn acquire_git_rejects_dash_reference() {
     };
     let err = acquire::git::acquire_git(&store, &coords, &source).unwrap_err();
     assert!(matches!(err, acquire::AcquireError::Git(_)));
+}
+
+#[test]
+fn acquire_package_uses_dist_when_present() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let pkg = LockedPackage {
+        name: "acme/pkg".into(),
+        version: "1.0.0".into(),
+        package_type: "library".into(),
+        dist: Some(Dist {
+            dist_type: "zip".into(),
+            url: Some("http://example/acme-pkg.zip".into()),
+            reference: "abc".into(),
+            shasum: String::new(),
+        }),
+        source: None,
+    };
+    let fetcher = StaticFetcher { bytes: make_composer_zip() };
+
+    acquire::acquire_package(&store, &fetcher, &pkg).unwrap();
+    let coords = PackageCoords::from_name("acme/pkg", "1.0.0").unwrap();
+    assert!(store.has(&coords));
+}
+
+#[test]
+fn acquire_package_skips_when_already_in_store_intact() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let pkg = LockedPackage {
+        name: "acme/pkg".into(),
+        version: "1.0.0".into(),
+        package_type: "library".into(),
+        dist: Some(Dist {
+            dist_type: "zip".into(),
+            url: Some("http://example/acme-pkg.zip".into()),
+            reference: "abc".into(),
+            shasum: String::new(),
+        }),
+        source: None,
+    };
+    acquire::acquire_package(&store, &StaticFetcher { bytes: make_composer_zip() }, &pkg).unwrap();
+    // segunda vez: fetcher que PANICA se chamado — prova que pulou o download
+    struct PanicFetcher;
+    impl acquire::Fetcher for PanicFetcher {
+        fn fetch(&self, _u: &str) -> Result<Vec<u8>, acquire::AcquireError> {
+            panic!("não deveria baixar — pacote já está íntegro no store");
+        }
+    }
+    acquire::acquire_package(&store, &PanicFetcher, &pkg).unwrap();
+}
+
+#[test]
+fn acquire_package_skips_platform_packages() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let php = LockedPackage {
+        name: "php".into(),
+        version: "8.2".into(),
+        package_type: "library".into(),
+        dist: None,
+        source: None,
+    };
+    acquire::acquire_package(&store, &StaticFetcher { bytes: vec![] }, &php).unwrap();
 }

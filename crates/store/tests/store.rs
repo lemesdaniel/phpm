@@ -2,6 +2,56 @@ use std::fs;
 use store::{sha256_tree, PackageCoords, Store};
 use tempfile::TempDir;
 
+/// Cria um diretório-fonte fake (simula pacote já extraído) e devolve o TempDir.
+fn fake_source() -> TempDir {
+    let src = TempDir::new().unwrap();
+    fs::create_dir_all(src.path().join("src")).unwrap();
+    fs::write(src.path().join("src/Logger.php"), b"<?php class Logger {}").unwrap();
+    fs::write(src.path().join("composer.json"), b"{\"name\":\"monolog/monolog\"}").unwrap();
+    src
+}
+
+#[test]
+fn write_package_materializes_tree_and_meta() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let src = fake_source();
+
+    assert!(!store.has(&coords()));
+    store.write_package(&coords(), src.path()).unwrap();
+    assert!(store.has(&coords()));
+
+    // conteúdo presente
+    let logger = store.package_path(&coords()).join("src/Logger.php");
+    assert_eq!(fs::read(&logger).unwrap(), b"<?php class Logger {}");
+
+    // meta json escrito com sha256
+    let meta_raw = fs::read_to_string(store.meta_path(&coords())).unwrap();
+    assert!(meta_raw.contains("\"sha256\""));
+    assert!(meta_raw.contains("monolog/monolog"));
+}
+
+#[test]
+fn write_package_twice_errors_already_exists() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    store.write_package(&coords(), fake_source().path()).unwrap();
+    let err = store.write_package(&coords(), fake_source().path()).unwrap_err();
+    assert!(matches!(err, store::StoreError::AlreadyExists(_)));
+}
+
+#[test]
+fn write_package_leaves_no_temp_on_success() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    store.write_package(&coords(), fake_source().path()).unwrap();
+    // diretório de temporários do store deve estar vazio
+    let tmp_dir = tmp.path().join("tmp");
+    if tmp_dir.exists() {
+        assert_eq!(fs::read_dir(&tmp_dir).unwrap().count(), 0);
+    }
+}
+
 fn coords() -> PackageCoords {
     PackageCoords {
         vendor: "monolog".into(),

@@ -1,6 +1,7 @@
 //! Store global do PHPM: layout, integridade, atomicidade e locks.
 
 mod hash;
+mod atomic;
 pub use hash::sha256_tree;
 
 use std::path::{Path, PathBuf};
@@ -79,5 +80,9 @@ impl Store {
 
     pub fn has(&self, coords: &PackageCoords) -> bool {
         self.package_path(coords).is_dir()
+    }
+
+    pub(crate) fn root_ref(&self) -> &std::path::Path {
+        &self.root
     }
 }

@@ -18,10 +18,19 @@ pub fn acquire_git(
     let checkout = staging.path().join("co");
     let checkout_str = checkout.to_string_lossy().into_owned();
 
-    run_git(&["clone", "--quiet", url, &checkout_str], None)?;
+    // protocol.ext.allow=never bloqueia ext::sh (RCE). Allowlist completa de protocolos fica p/ M3.
+    // `--` separa flags de argumentos posicionais: impede que a `url` vinda do composer.lock
+    // seja tratada como flag do git (argument injection, ex. --upload-pack=... → RCE).
+    // TODO(M3): clone completo é lento p/ repos grandes; avaliar --filter/--depth + fetch do sha.
+    run_git(
+        &["-c", "protocol.ext.allow=never", "clone", "--quiet", "--", url, &checkout_str],
+        None,
+    )?;
     if !source.reference.is_empty() {
+        // `--` DEPOIS da reference: garante que ela seja tratada como commit-ish (não pathspec)
+        // e impede que uma reference começando com `-` seja interpretada como flag.
         run_git(
-            &["-c", "advice.detachedHead=false", "checkout", "--quiet", &source.reference],
+            &["-c", "advice.detachedHead=false", "checkout", "--quiet", &source.reference, "--"],
             Some(&checkout),
         )?;
     }

@@ -212,3 +212,24 @@ fn acquire_git_source_writes_package() {
     assert!(store.package_path(&coords).join("composer.json").exists());
     assert!(!store.package_path(&coords).join(".git").exists());
 }
+
+#[test]
+fn acquire_git_errors_without_url() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let coords = PackageCoords { vendor: "acme".into(), package: "git".into(), version: "1.0.0".into() };
+    let source = Source { source_type: "git".into(), url: None, reference: "r".into() };
+    let err = acquire::git::acquire_git(&store, &coords, &source).unwrap_err();
+    assert!(matches!(err, acquire::AcquireError::NoSource(_)));
+}
+
+#[test]
+fn acquire_git_empty_reference_uses_head() {
+    let (repo, _sha) = make_git_repo();
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let coords = PackageCoords { vendor: "acme".into(), package: "githead".into(), version: "1.0.0".into() };
+    let source = Source { source_type: "git".into(), url: Some(format!("file://{}", repo.path().display())), reference: String::new() };
+    acquire::git::acquire_git(&store, &coords, &source).unwrap();
+    assert!(store.has(&coords));
+}

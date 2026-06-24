@@ -178,3 +178,35 @@ fn tree_hash_empty_dir_is_stable() {
     let b = TempDir::new().unwrap();
     assert_eq!(sha256_tree(a.path()).unwrap(), sha256_tree(b.path()).unwrap());
 }
+
+#[test]
+#[cfg(unix)]
+fn stored_files_are_read_only() {
+    use std::os::unix::fs::PermissionsExt;
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    store.write_package(&coords(), fake_source().path()).unwrap();
+
+    let logger = store.package_path(&coords()).join("src/Logger.php");
+    let mode = fs::metadata(&logger).unwrap().permissions().mode();
+    // nenhum bit de escrita (owner/group/other)
+    assert_eq!(mode & 0o222, 0, "arquivo do store deve ser read-only, mode={:o}", mode);
+
+    // escrita deve falhar
+    let write_result = fs::OpenOptions::new().write(true).open(&logger);
+    assert!(write_result.is_err(), "escrita em arquivo do store deveria falhar");
+}
+
+#[test]
+#[cfg(unix)]
+fn write_package_reheals_readonly_orphan() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    // primeira escrita completa → dir read-only
+    store.write_package(&coords(), fake_source().path()).unwrap();
+    // simula crash pós-read-only: remove só o meta, deixando dir read-only sem meta
+    fs::remove_file(store.meta_path(&coords())).unwrap();
+    // segunda escrita deve auto-curar mesmo com dir read-only
+    store.write_package(&coords(), fake_source().path()).unwrap();
+    assert!(store.meta_path(&coords()).exists());
+}

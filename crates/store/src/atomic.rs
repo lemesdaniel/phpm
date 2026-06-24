@@ -29,7 +29,8 @@ impl Store {
             }
             // dir presente mas sem meta = instalação parcial (crash entre rename e meta).
             // Remove o órfão e re-materializa. (Sob lock exclusivo quando Task 10 existir.)
-            // TODO(Task 8): chmod +w antes do remove quando store for read-only
+            // O dir pode estar read-only (crash pós-imutabilidade): restaura escrita antes de remover.
+            set_writable_recursive(&dest)?;
             fs::remove_dir_all(&dest)?;
         }
 
@@ -57,6 +58,10 @@ impl Store {
         }
         // rename atômico staging → destino
         fs::rename(&staging, &dest)?;
+
+        // imutabilidade: store é read-only. Write em vendor/ (mesmo inode via
+        // hard link em M3) falha alto em vez de corromper o store global.
+        set_read_only_recursive(&dest)?;
 
         // meta json
         let meta = Meta {
@@ -103,6 +108,61 @@ fn fsync_tree(root: &Path) -> Result<(), StoreError> {
             let f = fs::File::open(entry.path())?;
             f.sync_all()?;
         }
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn set_read_only_recursive(root: &Path) -> Result<(), StoreError> {
+    use std::os::unix::fs::PermissionsExt;
+    for entry in walkdir::WalkDir::new(root).follow_links(false) {
+        let entry = entry.map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
+        let meta = entry.metadata().map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
+        let mut perms = meta.permissions();
+        let mode = perms.mode();
+        // remove todos os bits de escrita, preserva leitura/execução
+        perms.set_mode(mode & !0o222);
+        fs::set_permissions(entry.path(), perms)?;
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn set_read_only_recursive(root: &Path) -> Result<(), StoreError> {
+    for entry in walkdir::WalkDir::new(root).follow_links(false) {
+        let entry = entry.map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
+        let mut perms = entry.metadata()
+            .map_err(|e| StoreError::Io(std::io::Error::other(e)))?
+            .permissions();
+        perms.set_readonly(true);
+        fs::set_permissions(entry.path(), perms)?;
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn set_writable_recursive(root: &Path) -> Result<(), StoreError> {
+    use std::os::unix::fs::PermissionsExt;
+    for entry in walkdir::WalkDir::new(root).follow_links(false) {
+        let entry = entry.map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
+        let meta = entry.metadata().map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
+        let mut perms = meta.permissions();
+        let mode = perms.mode();
+        perms.set_mode(mode | 0o200); // owner write
+        fs::set_permissions(entry.path(), perms)?;
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn set_writable_recursive(root: &Path) -> Result<(), StoreError> {
+    for entry in walkdir::WalkDir::new(root).follow_links(false) {
+        let entry = entry.map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
+        let mut perms = entry.metadata()
+            .map_err(|e| StoreError::Io(std::io::Error::other(e)))?
+            .permissions();
+        perms.set_readonly(false);
+        fs::set_permissions(entry.path(), perms)?;
     }
     Ok(())
 }

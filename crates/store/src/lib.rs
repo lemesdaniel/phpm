@@ -28,6 +28,9 @@ impl PackageCoords {
     /// Retorna None para nomes de plataforma (sem barra, ex. "php", "ext-json").
     pub fn from_name(name: &str, version: &str) -> Option<Self> {
         let (vendor, package) = name.split_once('/')?;
+        if vendor.is_empty() || package.is_empty() || package.contains('/') {
+            return None;
+        }
         Some(PackageCoords {
             vendor: vendor.to_string(),
             package: package.to_string(),
@@ -35,11 +38,16 @@ impl PackageCoords {
         })
     }
 
+    fn namespace_rel(&self) -> PathBuf {
+        Path::new(&self.vendor).join(&self.package)
+    }
+
     fn rel(&self) -> PathBuf {
-        Path::new(&self.vendor).join(&self.package).join(&self.version)
+        self.namespace_rel().join(&self.version)
     }
 }
 
+#[derive(Debug)]
 pub struct Store {
     root: PathBuf,
 }
@@ -62,8 +70,7 @@ impl Store {
         // "3.8.1.json". We append ".json" explicitly instead.
         self.root
             .join("meta")
-            .join(&coords.vendor)
-            .join(&coords.package)
+            .join(coords.namespace_rel())
             .join(format!("{}.json", coords.version))
     }
 

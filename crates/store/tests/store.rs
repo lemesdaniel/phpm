@@ -25,6 +25,22 @@ fn has_is_false_for_missing_package() {
 }
 
 #[test]
+fn has_is_true_when_package_dir_exists() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let c = coords();
+    std::fs::create_dir_all(store.package_path(&c)).unwrap();
+    assert!(store.has(&c));
+}
+
+#[test]
+fn from_name_rejects_malformed() {
+    assert!(PackageCoords::from_name("symfony/http-kernel/extra", "1.0").is_none());
+    assert!(PackageCoords::from_name("/pkg", "1.0").is_none());
+    assert!(PackageCoords::from_name("vendor/", "1.0").is_none());
+}
+
+#[test]
 fn coords_from_composer_name_splits_on_slash() {
     let c = PackageCoords::from_name("monolog/monolog", "3.8.1").unwrap();
     assert_eq!(c.vendor, "monolog");

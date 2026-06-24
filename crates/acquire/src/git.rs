@@ -10,10 +10,12 @@ pub fn acquire_git(
     coords: &PackageCoords,
     source: &Source,
 ) -> Result<(), AcquireError> {
-    let url = source
-        .url
-        .as_deref()
-        .ok_or_else(|| AcquireError::NoSource(format!("{}/{}", coords.vendor, coords.package)))?;
+    let url = source.url.as_deref().ok_or_else(|| {
+        AcquireError::NoSource(format!(
+            "{}/{}@{}",
+            coords.vendor, coords.package, coords.version
+        ))
+    })?;
 
     // Defesa em profundidade junto com os `--`: rejeita url/reference começando com `-`,
     // que o parser de opções do git veria como flag mesmo sendo argumento posicional.
@@ -26,6 +28,13 @@ pub fn acquire_git(
         return Err(AcquireError::Git(format!(
             "reference git rejeitada (começa com '-'): {}",
             source.reference
+        )));
+    }
+
+    if !source.source_type.eq_ignore_ascii_case("git") {
+        return Err(AcquireError::Git(format!(
+            "tipo de source não suportado: '{}' (apenas git no M2)",
+            source.source_type
         )));
     }
 
@@ -81,6 +90,8 @@ fn run_git(args: &[&str], cwd: Option<&std::path::Path>) -> Result<(), AcquireEr
     if let Some(dir) = cwd {
         cmd.current_dir(dir);
     }
+    // repo privado que precisa de auth falha rápido em vez de travar num prompt interativo.
+    cmd.env("GIT_TERMINAL_PROMPT", "0");
     let out = cmd
         .output()
         .map_err(|e| AcquireError::Git(format!("falha ao executar git: {e}")))?;

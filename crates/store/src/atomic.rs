@@ -38,7 +38,7 @@ impl Store {
         fs::create_dir_all(&tmp_root)?;
         // diretório temporário único por (coords) — sufixo determinístico simples;
         // a unicidade real entre processos é garantida pelo lock exclusivo (Task 10).
-        // TODO(Task 10): nome de staging seguro entre processos exige lock exclusivo
+        // Unicidade entre processos garantida pelo lock exclusivo que o caller (acquire_package) segura desde M2.
         let staging = tmp_root.join(format!(
             "{}__{}__{}.staging",
             coords.vendor, coords.package, coords.version

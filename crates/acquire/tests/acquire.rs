@@ -464,3 +464,41 @@ fn acquire_package_falls_back_to_git_when_dist_url_none() {
     let coords = PackageCoords::from_name("acme/fallback", "1.0.0").unwrap();
     assert!(store.has(&coords));
 }
+
+#[test]
+fn acquire_dist_rejects_non_zip_type() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let coords = PackageCoords {
+        vendor: "acme".into(),
+        package: "pkg".into(),
+        version: "1.0.0".into(),
+    };
+    let dist = Dist {
+        dist_type: "tar".into(),
+        url: Some("http://x/p.tar".into()),
+        reference: "r".into(),
+        shasum: String::new(),
+    };
+    let err = acquire::dist::acquire_dist(&store, &StaticFetcher { bytes: vec![] }, &coords, &dist)
+        .unwrap_err();
+    assert!(matches!(err, acquire::AcquireError::Zip(_)));
+}
+
+#[test]
+fn acquire_git_rejects_non_git_type() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let coords = PackageCoords {
+        vendor: "acme".into(),
+        package: "pkg".into(),
+        version: "1.0.0".into(),
+    };
+    let source = Source {
+        source_type: "svn".into(),
+        url: Some("file:///tmp/whatever".into()),
+        reference: String::new(),
+    };
+    let err = acquire::git::acquire_git(&store, &coords, &source).unwrap_err();
+    assert!(matches!(err, acquire::AcquireError::Git(_)));
+}

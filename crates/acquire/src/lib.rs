@@ -66,7 +66,7 @@ pub fn acquire_package(
         }
     }
     Err(AcquireError::NoSource(format!(
-        "{}/{}",
-        coords.vendor, coords.package
+        "{}/{}@{}",
+        coords.vendor, coords.package, coords.version
     )))
 }

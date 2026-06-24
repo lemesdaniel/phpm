@@ -1,0 +1,9 @@
+{
+  "content-hash": "deadbeef",
+  "packages": [
+    { "name": "monolog/monolog", "version": "3.8.1", "extra-unknown-field": 42 }
+  ],
+  "packages-dev": [
+    { "name": "phpunit/phpunit", "version": "11.0.0" }
+  ]
+}

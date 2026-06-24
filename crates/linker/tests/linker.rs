@@ -1,4 +1,5 @@
 use linker::materialize::{materialize_package, LinkMode};
+use linker::sentinel::{read_sentinel, write_sentinel};
 use linker::{sync, SyncReport};
 use lockfile::ComposerLock;
 use std::fs;
@@ -93,4 +94,23 @@ fn sync_on_empty_lock_creates_vendor_and_reports_zero() {
     assert_eq!(report.materialized, 0);
     assert_eq!(report.removed, 0);
     assert!(project.path().join("vendor").is_dir());
+}
+
+#[test]
+fn sentinel_round_trips_content_hash() {
+    let project = TempDir::new().unwrap();
+    let vendor = project.path().join("vendor");
+    std::fs::create_dir_all(&vendor).unwrap();
+
+    assert_eq!(read_sentinel(&vendor).unwrap(), None, "absent sentinel → None");
+
+    write_sentinel(&vendor, "abc123").unwrap();
+    assert_eq!(read_sentinel(&vendor).unwrap().as_deref(), Some("abc123"));
+}
+
+#[test]
+fn sentinel_absent_when_vendor_missing() {
+    let project = TempDir::new().unwrap();
+    let vendor = project.path().join("vendor"); // not created
+    assert_eq!(read_sentinel(&vendor).unwrap(), None);
 }

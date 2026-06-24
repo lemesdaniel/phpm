@@ -1,6 +1,7 @@
 //! Materializes a project's vendor/ from the global store via hard links.
 
 pub mod materialize;
+pub mod sentinel;
 pub mod volume;
 
 use lockfile::ComposerLock;

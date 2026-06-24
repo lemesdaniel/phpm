@@ -2,6 +2,7 @@
 
 mod hash;
 mod atomic;
+mod verify;
 pub use hash::sha256_tree;
 
 use std::path::{Path, PathBuf};

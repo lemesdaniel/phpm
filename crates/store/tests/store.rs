@@ -80,6 +80,37 @@ fn coords() -> PackageCoords {
 }
 
 #[test]
+fn verify_passes_for_intact_package() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    store.write_package(&coords(), fake_source().path()).unwrap();
+    assert!(store.verify(&coords()).unwrap(), "pacote íntegro deve verificar");
+}
+
+#[test]
+fn verify_fails_when_meta_missing() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    store.write_package(&coords(), fake_source().path()).unwrap();
+    fs::remove_file(store.meta_path(&coords())).unwrap();
+    let err = store.verify(&coords()).unwrap_err();
+    assert!(matches!(err, store::StoreError::MissingMeta(_)));
+}
+
+#[test]
+fn verify_fails_on_integrity_mismatch() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    store.write_package(&coords(), fake_source().path()).unwrap();
+    // adultera o sha gravado no meta (meta é writable)
+    let meta_path = store.meta_path(&coords());
+    let tampered = r#"{"name":"monolog/monolog","version":"3.8.1","sha256":"0000000000000000000000000000000000000000000000000000000000000000"}"#;
+    fs::write(&meta_path, tampered).unwrap();
+    let err = store.verify(&coords()).unwrap_err();
+    assert!(matches!(err, store::StoreError::Integrity { .. }));
+}
+
+#[test]
 fn package_path_follows_layout() {
     let tmp = TempDir::new().unwrap();
     let store = Store::new(tmp.path());

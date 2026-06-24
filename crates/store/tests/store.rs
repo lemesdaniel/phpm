@@ -135,10 +135,8 @@ fn verify_passes_for_intact_package() {
     store
         .write_package(&coords(), fake_source().path())
         .unwrap();
-    assert!(
-        store.verify(&coords()).unwrap(),
-        "pacote íntegro deve verificar"
-    );
+    // pacote íntegro: verify retorna Ok(())
+    store.verify(&coords()).unwrap();
 }
 
 #[test]

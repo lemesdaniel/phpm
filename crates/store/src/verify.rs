@@ -10,9 +10,8 @@ struct MetaRead {
 
 impl Store {
     /// Recalcula o sha256 da árvore do pacote e compara com o meta gravado.
-    /// Erra MissingMeta se o meta não existe. Retorna Err(Integrity) se diverge.
-    // TODO: bool é sempre true; considerar Result<()> antes de estabilizar a API.
-    pub fn verify(&self, coords: &PackageCoords) -> Result<bool, StoreError> {
+    /// Ok(()) se íntegro. Erra MissingMeta se o meta não existe, Integrity se diverge.
+    pub fn verify(&self, coords: &PackageCoords) -> Result<(), StoreError> {
         let meta_path = self.meta_path(coords);
         // "meta ausente" (NotFound) casa com o self-heal de write_package (dir sem meta = parcial).
         let meta_raw = fs::read_to_string(&meta_path).map_err(|e| {
@@ -33,6 +32,6 @@ impl Store {
                 actual,
             });
         }
-        Ok(true)
+        Ok(())
     }
 }

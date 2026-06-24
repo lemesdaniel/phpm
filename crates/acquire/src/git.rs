@@ -14,6 +14,18 @@ pub fn acquire_git(
         AcquireError::NoSource(format!("{}/{}", coords.vendor, coords.package))
     })?;
 
+    // Defesa em profundidade junto com os `--`: rejeita url/reference começando com `-`,
+    // que o parser de opções do git veria como flag mesmo sendo argumento posicional.
+    if url.starts_with('-') {
+        return Err(AcquireError::Git(format!("url git rejeitada (começa com '-'): {url}")));
+    }
+    if source.reference.starts_with('-') {
+        return Err(AcquireError::Git(format!(
+            "reference git rejeitada (começa com '-'): {}",
+            source.reference
+        )));
+    }
+
     let staging = tempfile::TempDir::new()?;
     let checkout = staging.path().join("co");
     let checkout_str = checkout.to_string_lossy().into_owned();

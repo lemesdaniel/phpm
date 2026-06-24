@@ -233,3 +233,18 @@ fn acquire_git_empty_reference_uses_head() {
     acquire::git::acquire_git(&store, &coords, &source).unwrap();
     assert!(store.has(&coords));
 }
+
+#[test]
+fn acquire_git_rejects_dash_reference() {
+    let (repo, _sha) = make_git_repo();
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let coords = PackageCoords { vendor: "acme".into(), package: "dash".into(), version: "1.0.0".into() };
+    let source = Source {
+        source_type: "git".into(),
+        url: Some(format!("file://{}", repo.path().display())),
+        reference: "--upload-pack=evil".into(),
+    };
+    let err = acquire::git::acquire_git(&store, &coords, &source).unwrap_err();
+    assert!(matches!(err, acquire::AcquireError::Git(_)));
+}

@@ -1,6 +1,7 @@
 use acquire::{AcquireError, Fetcher};
-use lockfile::Dist;
+use lockfile::{Dist, Source};
 use std::io::Write;
+use std::process::Command;
 use store::{PackageCoords, Store};
 
 /// Fetcher de teste que devolve bytes fixos, sem rede.
@@ -166,4 +167,48 @@ fn extract_without_common_root_is_flat() {
     acquire::zipx::extract_strip_root(&buf, tmp.path()).unwrap();
     assert!(tmp.path().join("a/x.php").exists());
     assert!(tmp.path().join("b/y.php").exists());
+}
+
+/// Cria um repositório git local, commita 1 arquivo, devolve (dir, sha).
+fn make_git_repo() -> (tempfile::TempDir, String) {
+    let dir = tempfile::TempDir::new().unwrap();
+    let run = |args: &[&str]| {
+        let ok = Command::new("git")
+            .args(args)
+            .current_dir(dir.path())
+            .env("GIT_AUTHOR_NAME", "t")
+            .env("GIT_AUTHOR_EMAIL", "t@t")
+            .env("GIT_COMMITTER_NAME", "t")
+            .env("GIT_COMMITTER_EMAIL", "t@t")
+            .output()
+            .unwrap();
+        assert!(ok.status.success(), "git {:?}: {}", args, String::from_utf8_lossy(&ok.stderr));
+    };
+    run(&["init", "-q"]);
+    std::fs::write(dir.path().join("composer.json"), b"{\"name\":\"acme/git\"}").unwrap();
+    run(&["add", "."]);
+    run(&["-c", "commit.gpgsign=false", "commit", "-qm", "init"]);
+    let out = Command::new("git").args(["rev-parse", "HEAD"]).current_dir(dir.path()).output().unwrap();
+    let sha = String::from_utf8(out.stdout).unwrap().trim().to_string();
+    (dir, sha)
+}
+
+#[test]
+fn acquire_git_source_writes_package() {
+    let (repo, sha) = make_git_repo();
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let coords = PackageCoords { vendor: "acme".into(), package: "git".into(), version: "1.0.0".into() };
+    let source = Source {
+        source_type: "git".into(),
+        url: Some(format!("file://{}", repo.path().display())),
+        reference: sha,
+    };
+
+    acquire::git::acquire_git(&store, &coords, &source).unwrap();
+
+    assert!(store.has(&coords));
+    store.verify(&coords).unwrap();
+    assert!(store.package_path(&coords).join("composer.json").exists());
+    assert!(!store.package_path(&coords).join(".git").exists());
 }

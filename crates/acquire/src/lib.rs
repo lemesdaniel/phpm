@@ -2,6 +2,7 @@
 
 mod fetch;
 pub mod dist;
+pub mod git;
 pub mod shasum;
 pub mod zipx;
 

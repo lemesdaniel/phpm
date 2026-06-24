@@ -117,7 +117,9 @@ fn set_read_only_recursive(root: &Path) -> Result<(), StoreError> {
     use std::os::unix::fs::PermissionsExt;
     for entry in walkdir::WalkDir::new(root).follow_links(false) {
         let entry = entry.map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
-        let meta = entry.metadata().map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
+        let meta = entry
+            .metadata()
+            .map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
         let mut perms = meta.permissions();
         let mode = perms.mode();
         // remove todos os bits de escrita, preserva leitura/execução
@@ -131,7 +133,8 @@ fn set_read_only_recursive(root: &Path) -> Result<(), StoreError> {
 fn set_read_only_recursive(root: &Path) -> Result<(), StoreError> {
     for entry in walkdir::WalkDir::new(root).follow_links(false) {
         let entry = entry.map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
-        let mut perms = entry.metadata()
+        let mut perms = entry
+            .metadata()
             .map_err(|e| StoreError::Io(std::io::Error::other(e)))?
             .permissions();
         perms.set_readonly(true);
@@ -152,7 +155,9 @@ fn set_writable_recursive(root: &Path) -> Result<(), StoreError> {
     use std::os::unix::fs::PermissionsExt;
     for entry in walkdir::WalkDir::new(root).follow_links(false) {
         let entry = entry.map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
-        let meta = entry.metadata().map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
+        let meta = entry
+            .metadata()
+            .map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
         let mut perms = meta.permissions();
         let mode = perms.mode();
         perms.set_mode(mode | 0o200); // owner write
@@ -165,7 +170,8 @@ fn set_writable_recursive(root: &Path) -> Result<(), StoreError> {
 fn set_writable_recursive(root: &Path) -> Result<(), StoreError> {
     for entry in walkdir::WalkDir::new(root).follow_links(false) {
         let entry = entry.map_err(|e| StoreError::Io(std::io::Error::other(e)))?;
-        let mut perms = entry.metadata()
+        let mut perms = entry
+            .metadata()
             .map_err(|e| StoreError::Io(std::io::Error::other(e)))?
             .permissions();
         perms.set_readonly(false);

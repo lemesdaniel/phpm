@@ -5,9 +5,15 @@ const APP: &str = include_str!("fixtures/laravel-ish.composer.json");
 #[test]
 fn parses_require_and_dev() {
     let cj = parse_json(APP).expect("deve parsear");
-    assert_eq!(cj.require.get("laravel/framework").map(String::as_str), Some("^11.0"));
+    assert_eq!(
+        cj.require.get("laravel/framework").map(String::as_str),
+        Some("^11.0")
+    );
     assert_eq!(cj.require.get("php").map(String::as_str), Some("^8.2"));
-    assert_eq!(cj.require_dev.get("phpunit/phpunit").map(String::as_str), Some("^11.0"));
+    assert_eq!(
+        cj.require_dev.get("phpunit/phpunit").map(String::as_str),
+        Some("^11.0")
+    );
 }
 
 #[test]
@@ -17,7 +23,10 @@ fn parses_psr4_string_and_array() {
     assert_eq!(psr4.get("App\\").unwrap().as_slice(), &["app/".to_string()]);
     assert_eq!(
         psr4.get("Database\\Factories\\").unwrap().as_slice(),
-        &["database/factories/".to_string(), "extra/factories/".to_string()]
+        &[
+            "database/factories/".to_string(),
+            "extra/factories/".to_string()
+        ]
     );
 }
 

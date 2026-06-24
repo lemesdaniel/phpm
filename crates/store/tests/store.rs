@@ -7,7 +7,11 @@ fn fake_source() -> TempDir {
     let src = TempDir::new().unwrap();
     fs::create_dir_all(src.path().join("src")).unwrap();
     fs::write(src.path().join("src/Logger.php"), b"<?php class Logger {}").unwrap();
-    fs::write(src.path().join("composer.json"), b"{\"name\":\"monolog/monolog\"}").unwrap();
+    fs::write(
+        src.path().join("composer.json"),
+        b"{\"name\":\"monolog/monolog\"}",
+    )
+    .unwrap();
     src
 }
 
@@ -44,7 +48,9 @@ fn write_package_reheals_orphaned_dir_without_meta() {
     fs::create_dir_all(store.package_path(&coords())).unwrap();
     assert!(!store.meta_path(&coords()).exists());
     // write deve auto-curar (re-materializar), não erro
-    store.write_package(&coords(), fake_source().path()).unwrap();
+    store
+        .write_package(&coords(), fake_source().path())
+        .unwrap();
     assert!(store.meta_path(&coords()).exists());
     let logger = store.package_path(&coords()).join("src/Logger.php");
     assert_eq!(fs::read(&logger).unwrap(), b"<?php class Logger {}");
@@ -54,8 +60,12 @@ fn write_package_reheals_orphaned_dir_without_meta() {
 fn write_package_twice_errors_already_exists() {
     let tmp = TempDir::new().unwrap();
     let store = Store::new(tmp.path());
-    store.write_package(&coords(), fake_source().path()).unwrap();
-    let err = store.write_package(&coords(), fake_source().path()).unwrap_err();
+    store
+        .write_package(&coords(), fake_source().path())
+        .unwrap();
+    let err = store
+        .write_package(&coords(), fake_source().path())
+        .unwrap_err();
     assert!(matches!(err, store::StoreError::AlreadyExists(_)));
 }
 
@@ -63,7 +73,9 @@ fn write_package_twice_errors_already_exists() {
 fn write_package_leaves_no_temp_on_success() {
     let tmp = TempDir::new().unwrap();
     let store = Store::new(tmp.path());
-    store.write_package(&coords(), fake_source().path()).unwrap();
+    store
+        .write_package(&coords(), fake_source().path())
+        .unwrap();
     // diretório de temporários do store deve estar vazio
     let tmp_dir = tmp.path().join("tmp");
     if tmp_dir.exists() {
@@ -120,15 +132,22 @@ fn lock_file_lives_under_locks_dir() {
 fn verify_passes_for_intact_package() {
     let tmp = TempDir::new().unwrap();
     let store = Store::new(tmp.path());
-    store.write_package(&coords(), fake_source().path()).unwrap();
-    assert!(store.verify(&coords()).unwrap(), "pacote íntegro deve verificar");
+    store
+        .write_package(&coords(), fake_source().path())
+        .unwrap();
+    assert!(
+        store.verify(&coords()).unwrap(),
+        "pacote íntegro deve verificar"
+    );
 }
 
 #[test]
 fn verify_fails_when_meta_missing() {
     let tmp = TempDir::new().unwrap();
     let store = Store::new(tmp.path());
-    store.write_package(&coords(), fake_source().path()).unwrap();
+    store
+        .write_package(&coords(), fake_source().path())
+        .unwrap();
     fs::remove_file(store.meta_path(&coords())).unwrap();
     let err = store.verify(&coords()).unwrap_err();
     assert!(matches!(err, store::StoreError::MissingMeta(_)));
@@ -138,7 +157,9 @@ fn verify_fails_when_meta_missing() {
 fn verify_fails_on_integrity_mismatch() {
     let tmp = TempDir::new().unwrap();
     let store = Store::new(tmp.path());
-    store.write_package(&coords(), fake_source().path()).unwrap();
+    store
+        .write_package(&coords(), fake_source().path())
+        .unwrap();
     // adultera o sha gravado no meta (meta é writable)
     let meta_path = store.meta_path(&coords());
     let tampered = r#"{"name":"monolog/monolog","version":"3.8.1","sha256":"0000000000000000000000000000000000000000000000000000000000000000"}"#;
@@ -214,7 +235,10 @@ fn tree_hash_is_stable_and_order_independent() {
     fs::create_dir_all(b.path().join("src")).unwrap();
     fs::write(b.path().join("src/Logger.php"), b"<?php class Logger {}").unwrap();
 
-    assert_eq!(sha256_tree(a.path()).unwrap(), sha256_tree(b.path()).unwrap());
+    assert_eq!(
+        sha256_tree(a.path()).unwrap(),
+        sha256_tree(b.path()).unwrap()
+    );
 }
 
 #[test]
@@ -244,7 +268,10 @@ fn tree_hash_changes_with_path() {
 fn tree_hash_empty_dir_is_stable() {
     let a = TempDir::new().unwrap();
     let b = TempDir::new().unwrap();
-    assert_eq!(sha256_tree(a.path()).unwrap(), sha256_tree(b.path()).unwrap());
+    assert_eq!(
+        sha256_tree(a.path()).unwrap(),
+        sha256_tree(b.path()).unwrap()
+    );
 }
 
 #[test]
@@ -253,20 +280,35 @@ fn stored_files_are_read_only() {
     use std::os::unix::fs::PermissionsExt;
     let tmp = TempDir::new().unwrap();
     let store = Store::new(tmp.path());
-    store.write_package(&coords(), fake_source().path()).unwrap();
+    store
+        .write_package(&coords(), fake_source().path())
+        .unwrap();
 
     let logger = store.package_path(&coords()).join("src/Logger.php");
     let mode = fs::metadata(&logger).unwrap().permissions().mode();
     // nenhum bit de escrita (owner/group/other)
-    assert_eq!(mode & 0o222, 0, "arquivo do store deve ser read-only, mode={:o}", mode);
+    assert_eq!(
+        mode & 0o222,
+        0,
+        "arquivo do store deve ser read-only, mode={:o}",
+        mode
+    );
 
     // escrita deve falhar
     let write_result = fs::OpenOptions::new().write(true).open(&logger);
-    assert!(write_result.is_err(), "escrita em arquivo do store deveria falhar");
+    assert!(
+        write_result.is_err(),
+        "escrita em arquivo do store deveria falhar"
+    );
 
     let src_dir = store.package_path(&coords()).join("src");
     let dmode = fs::metadata(&src_dir).unwrap().permissions().mode();
-    assert_eq!(dmode & 0o222, 0, "diretório do store deve ser read-only, mode={:o}", dmode);
+    assert_eq!(
+        dmode & 0o222,
+        0,
+        "diretório do store deve ser read-only, mode={:o}",
+        dmode
+    );
 }
 
 #[test]
@@ -275,11 +317,15 @@ fn write_package_reheals_readonly_orphan() {
     let tmp = TempDir::new().unwrap();
     let store = Store::new(tmp.path());
     // primeira escrita completa → dir read-only
-    store.write_package(&coords(), fake_source().path()).unwrap();
+    store
+        .write_package(&coords(), fake_source().path())
+        .unwrap();
     // simula crash pós-read-only: remove só o meta, deixando dir read-only sem meta
     fs::remove_file(store.meta_path(&coords())).unwrap();
     // segunda escrita deve auto-curar mesmo com dir read-only
-    store.write_package(&coords(), fake_source().path()).unwrap();
+    store
+        .write_package(&coords(), fake_source().path())
+        .unwrap();
     assert!(store.meta_path(&coords()).exists());
 
     use std::os::unix::fs::PermissionsExt;

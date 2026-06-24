@@ -1,10 +1,10 @@
 //! Parsing de composer.lock e composer.json. Sem I/O.
 
-mod lock;
 mod json;
+mod lock;
 
-pub use lock::{ComposerLock, Dist, LockedPackage, Source};
 pub use json::{Autoload, ComposerJson};
+pub use lock::{ComposerLock, Dist, LockedPackage, Source};
 
 #[derive(Debug, thiserror::Error)]
 pub enum LockError {

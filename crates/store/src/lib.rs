@@ -1,9 +1,9 @@
 //! Store global do PHPM: layout, integridade, atomicidade e locks.
 
-mod hash;
 mod atomic;
-mod verify;
+mod hash;
 mod lock;
+mod verify;
 pub use hash::sha256_tree;
 pub use lock::PackageLock;
 

@@ -85,6 +85,22 @@ fn extract_rejects_symlink_entry() {
 }
 
 #[test]
+fn shasum_ok_when_matches_and_skips_when_empty() {
+    let bytes = b"hello world";
+    // sha1("hello world") = 2aae6c35c94fcfb415dbe95f408b9ce91ee846ed
+    let sha = "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed";
+    acquire::shasum::verify_sha1(bytes, sha).unwrap();
+    // shasum vazio → pula (Ok)
+    acquire::shasum::verify_sha1(bytes, "").unwrap();
+}
+
+#[test]
+fn shasum_err_on_mismatch() {
+    let err = acquire::shasum::verify_sha1(b"hello world", "0000").unwrap_err();
+    assert!(matches!(err, acquire::AcquireError::Shasum { .. }));
+}
+
+#[test]
 fn extract_without_common_root_is_flat() {
     let mut buf = Vec::new();
     {

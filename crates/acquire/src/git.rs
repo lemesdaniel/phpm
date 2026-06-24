@@ -10,14 +10,17 @@ pub fn acquire_git(
     coords: &PackageCoords,
     source: &Source,
 ) -> Result<(), AcquireError> {
-    let url = source.url.as_deref().ok_or_else(|| {
-        AcquireError::NoSource(format!("{}/{}", coords.vendor, coords.package))
-    })?;
+    let url = source
+        .url
+        .as_deref()
+        .ok_or_else(|| AcquireError::NoSource(format!("{}/{}", coords.vendor, coords.package)))?;
 
     // Defesa em profundidade junto com os `--`: rejeita url/reference começando com `-`,
     // que o parser de opções do git veria como flag mesmo sendo argumento posicional.
     if url.starts_with('-') {
-        return Err(AcquireError::Git(format!("url git rejeitada (começa com '-'): {url}")));
+        return Err(AcquireError::Git(format!(
+            "url git rejeitada (começa com '-'): {url}"
+        )));
     }
     if source.reference.starts_with('-') {
         return Err(AcquireError::Git(format!(
@@ -35,14 +38,29 @@ pub fn acquire_git(
     // seja tratada como flag do git (argument injection, ex. --upload-pack=... → RCE).
     // TODO(M3): clone completo é lento p/ repos grandes; avaliar --filter/--depth + fetch do sha.
     run_git(
-        &["-c", "protocol.ext.allow=never", "clone", "--quiet", "--", url, &checkout_str],
+        &[
+            "-c",
+            "protocol.ext.allow=never",
+            "clone",
+            "--quiet",
+            "--",
+            url,
+            &checkout_str,
+        ],
         None,
     )?;
     if !source.reference.is_empty() {
         // `--` DEPOIS da reference: garante que ela seja tratada como commit-ish (não pathspec)
         // e impede que uma reference começando com `-` seja interpretada como flag.
         run_git(
-            &["-c", "advice.detachedHead=false", "checkout", "--quiet", &source.reference, "--"],
+            &[
+                "-c",
+                "advice.detachedHead=false",
+                "checkout",
+                "--quiet",
+                &source.reference,
+                "--",
+            ],
             Some(&checkout),
         )?;
     }

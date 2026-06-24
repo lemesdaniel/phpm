@@ -10,9 +10,10 @@ pub fn acquire_dist(
     coords: &PackageCoords,
     dist: &Dist,
 ) -> Result<(), AcquireError> {
-    let url = dist.url.as_deref().ok_or_else(|| {
-        AcquireError::NoSource(format!("{}/{}", coords.vendor, coords.package))
-    })?;
+    let url = dist
+        .url
+        .as_deref()
+        .ok_or_else(|| AcquireError::NoSource(format!("{}/{}", coords.vendor, coords.package)))?;
 
     let bytes = fetcher.fetch(url)?;
     shasum::verify_sha1(&bytes, &dist.shasum)?;

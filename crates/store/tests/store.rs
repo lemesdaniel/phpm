@@ -73,7 +73,9 @@ fn write_package_twice_errors_already_exists() {
 fn remove_package_clears_dir_and_meta() {
     let tmp = TempDir::new().unwrap();
     let store = Store::new(tmp.path());
-    store.write_package(&coords(), fake_source().path()).unwrap();
+    store
+        .write_package(&coords(), fake_source().path())
+        .unwrap();
     assert!(store.has(&coords()));
     store.remove_package(&coords()).unwrap();
     assert!(!store.has(&coords()));

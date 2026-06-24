@@ -1,7 +1,7 @@
 //! Aquisição de pacotes: baixa dist ou clona git source para o store global.
 
-mod fetch;
 pub mod dist;
+mod fetch;
 pub mod git;
 pub mod shasum;
 pub mod zipx;
@@ -65,5 +65,8 @@ pub fn acquire_package(
             return git::acquire_git(store, &coords, source);
         }
     }
-    Err(AcquireError::NoSource(format!("{}/{}", coords.vendor, coords.package)))
+    Err(AcquireError::NoSource(format!(
+        "{}/{}",
+        coords.vendor, coords.package
+    )))
 }

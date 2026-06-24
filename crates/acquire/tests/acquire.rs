@@ -17,7 +17,9 @@ impl Fetcher for StaticFetcher {
 
 #[test]
 fn static_fetcher_returns_bytes() {
-    let f = StaticFetcher { bytes: vec![1, 2, 3] };
+    let f = StaticFetcher {
+        bytes: vec![1, 2, 3],
+    };
     assert_eq!(f.fetch("http://x").unwrap(), vec![1, 2, 3]);
 }
 
@@ -29,7 +31,8 @@ fn make_composer_zip() -> Vec<u8> {
         let mut zip = zip::ZipWriter::new(w);
         let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default();
         zip.add_directory("acme-pkg-abc123/", opts).unwrap();
-        zip.start_file("acme-pkg-abc123/composer.json", opts).unwrap();
+        zip.start_file("acme-pkg-abc123/composer.json", opts)
+            .unwrap();
         zip.write_all(b"{\"name\":\"acme/pkg\"}").unwrap();
         zip.add_directory("acme-pkg-abc123/src/", opts).unwrap();
         zip.start_file("acme-pkg-abc123/src/A.php", opts).unwrap();
@@ -79,7 +82,8 @@ fn extract_rejects_symlink_entry() {
         let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default();
         zip.add_directory("pkg-root/", opts).unwrap();
         // alvo do symlink como conteúdo (formato zip de symlink unix)
-        zip.add_symlink("pkg-root/link", "../../secret", opts).unwrap();
+        zip.add_symlink("pkg-root/link", "../../secret", opts)
+            .unwrap();
         zip.finish().unwrap();
     }
     let tmp = tempfile::TempDir::new().unwrap();
@@ -118,22 +122,28 @@ fn acquire_dist_writes_package_to_store() {
         reference: "abc123".into(),
         shasum: String::new(),
     };
-    let fetcher = StaticFetcher { bytes: make_composer_zip() };
+    let fetcher = StaticFetcher {
+        bytes: make_composer_zip(),
+    };
 
     acquire::dist::acquire_dist(&store, &fetcher, &coords, &dist).unwrap();
 
     assert!(store.has(&coords));
     store.verify(&coords).unwrap();
     let composer = store.package_path(&coords).join("composer.json");
-    assert_eq!(std::fs::read(&composer).unwrap(), b"{\"name\":\"acme/pkg\"}");
+    assert_eq!(
+        std::fs::read(&composer).unwrap(),
+        b"{\"name\":\"acme/pkg\"}"
+    );
 }
 
 #[test]
 #[ignore = "rede: rode com --ignored quando quiser validar download real"]
 fn http_fetcher_downloads_real_dist() {
-    use acquire::HttpFetcher;
     use acquire::Fetcher;
-    let url = "https://api.github.com/repos/php-fig/log/zipball/79dff0b268932c640297f5208d6298f71855c03e";
+    use acquire::HttpFetcher;
+    let url =
+        "https://api.github.com/repos/php-fig/log/zipball/79dff0b268932c640297f5208d6298f71855c03e";
     let fetcher = HttpFetcher::new().unwrap();
     let bytes = fetcher.fetch(url).unwrap();
     assert!(bytes.len() > 1000, "deve baixar um zip não-trivial");
@@ -144,8 +154,17 @@ fn http_fetcher_downloads_real_dist() {
 fn acquire_dist_errors_without_url() {
     let tmp = tempfile::TempDir::new().unwrap();
     let store = Store::new(tmp.path());
-    let coords = PackageCoords { vendor: "acme".into(), package: "pkg".into(), version: "1.0.0".into() };
-    let dist = Dist { dist_type: "zip".into(), url: None, reference: "r".into(), shasum: String::new() };
+    let coords = PackageCoords {
+        vendor: "acme".into(),
+        package: "pkg".into(),
+        version: "1.0.0".into(),
+    };
+    let dist = Dist {
+        dist_type: "zip".into(),
+        url: None,
+        reference: "r".into(),
+        shasum: String::new(),
+    };
     let fetcher = StaticFetcher { bytes: vec![] };
     let err = acquire::dist::acquire_dist(&store, &fetcher, &coords, &dist).unwrap_err();
     assert!(matches!(err, acquire::AcquireError::NoSource(_)));
@@ -182,13 +201,22 @@ fn make_git_repo() -> (tempfile::TempDir, String) {
             .env("GIT_COMMITTER_EMAIL", "t@t")
             .output()
             .unwrap();
-        assert!(ok.status.success(), "git {:?}: {}", args, String::from_utf8_lossy(&ok.stderr));
+        assert!(
+            ok.status.success(),
+            "git {:?}: {}",
+            args,
+            String::from_utf8_lossy(&ok.stderr)
+        );
     };
     run(&["init", "-q"]);
     std::fs::write(dir.path().join("composer.json"), b"{\"name\":\"acme/git\"}").unwrap();
     run(&["add", "."]);
     run(&["-c", "commit.gpgsign=false", "commit", "-qm", "init"]);
-    let out = Command::new("git").args(["rev-parse", "HEAD"]).current_dir(dir.path()).output().unwrap();
+    let out = Command::new("git")
+        .args(["rev-parse", "HEAD"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
     let sha = String::from_utf8(out.stdout).unwrap().trim().to_string();
     (dir, sha)
 }
@@ -198,7 +226,11 @@ fn acquire_git_source_writes_package() {
     let (repo, sha) = make_git_repo();
     let tmp = tempfile::TempDir::new().unwrap();
     let store = Store::new(tmp.path());
-    let coords = PackageCoords { vendor: "acme".into(), package: "git".into(), version: "1.0.0".into() };
+    let coords = PackageCoords {
+        vendor: "acme".into(),
+        package: "git".into(),
+        version: "1.0.0".into(),
+    };
     let source = Source {
         source_type: "git".into(),
         url: Some(format!("file://{}", repo.path().display())),
@@ -217,8 +249,16 @@ fn acquire_git_source_writes_package() {
 fn acquire_git_errors_without_url() {
     let tmp = tempfile::TempDir::new().unwrap();
     let store = Store::new(tmp.path());
-    let coords = PackageCoords { vendor: "acme".into(), package: "git".into(), version: "1.0.0".into() };
-    let source = Source { source_type: "git".into(), url: None, reference: "r".into() };
+    let coords = PackageCoords {
+        vendor: "acme".into(),
+        package: "git".into(),
+        version: "1.0.0".into(),
+    };
+    let source = Source {
+        source_type: "git".into(),
+        url: None,
+        reference: "r".into(),
+    };
     let err = acquire::git::acquire_git(&store, &coords, &source).unwrap_err();
     assert!(matches!(err, acquire::AcquireError::NoSource(_)));
 }
@@ -228,8 +268,16 @@ fn acquire_git_empty_reference_uses_head() {
     let (repo, _sha) = make_git_repo();
     let tmp = tempfile::TempDir::new().unwrap();
     let store = Store::new(tmp.path());
-    let coords = PackageCoords { vendor: "acme".into(), package: "githead".into(), version: "1.0.0".into() };
-    let source = Source { source_type: "git".into(), url: Some(format!("file://{}", repo.path().display())), reference: String::new() };
+    let coords = PackageCoords {
+        vendor: "acme".into(),
+        package: "githead".into(),
+        version: "1.0.0".into(),
+    };
+    let source = Source {
+        source_type: "git".into(),
+        url: Some(format!("file://{}", repo.path().display())),
+        reference: String::new(),
+    };
     acquire::git::acquire_git(&store, &coords, &source).unwrap();
     assert!(store.has(&coords));
 }
@@ -239,7 +287,11 @@ fn acquire_git_rejects_dash_reference() {
     let (repo, _sha) = make_git_repo();
     let tmp = tempfile::TempDir::new().unwrap();
     let store = Store::new(tmp.path());
-    let coords = PackageCoords { vendor: "acme".into(), package: "dash".into(), version: "1.0.0".into() };
+    let coords = PackageCoords {
+        vendor: "acme".into(),
+        package: "dash".into(),
+        version: "1.0.0".into(),
+    };
     let source = Source {
         source_type: "git".into(),
         url: Some(format!("file://{}", repo.path().display())),
@@ -265,7 +317,9 @@ fn acquire_package_uses_dist_when_present() {
         }),
         source: None,
     };
-    let fetcher = StaticFetcher { bytes: make_composer_zip() };
+    let fetcher = StaticFetcher {
+        bytes: make_composer_zip(),
+    };
 
     acquire::acquire_package(&store, &fetcher, &pkg).unwrap();
     let coords = PackageCoords::from_name("acme/pkg", "1.0.0").unwrap();
@@ -288,7 +342,14 @@ fn acquire_package_skips_when_already_in_store_intact() {
         }),
         source: None,
     };
-    acquire::acquire_package(&store, &StaticFetcher { bytes: make_composer_zip() }, &pkg).unwrap();
+    acquire::acquire_package(
+        &store,
+        &StaticFetcher {
+            bytes: make_composer_zip(),
+        },
+        &pkg,
+    )
+    .unwrap();
     // segunda vez: fetcher que PANICA se chamado — prova que pulou o download
     struct PanicFetcher;
     impl acquire::Fetcher for PanicFetcher {
@@ -320,11 +381,25 @@ fn acquire_package_repairs_corrupt_store_entry() {
     let tmp = tempfile::TempDir::new().unwrap();
     let store = Store::new(tmp.path());
     let pkg = LockedPackage {
-        name: "acme/pkg".into(), version: "1.0.0".into(), package_type: "library".into(),
-        dist: Some(Dist { dist_type: "zip".into(), url: Some("http://x/p.zip".into()), reference: "a".into(), shasum: String::new() }),
+        name: "acme/pkg".into(),
+        version: "1.0.0".into(),
+        package_type: "library".into(),
+        dist: Some(Dist {
+            dist_type: "zip".into(),
+            url: Some("http://x/p.zip".into()),
+            reference: "a".into(),
+            shasum: String::new(),
+        }),
         source: None,
     };
-    acquire::acquire_package(&store, &StaticFetcher { bytes: make_composer_zip() }, &pkg).unwrap();
+    acquire::acquire_package(
+        &store,
+        &StaticFetcher {
+            bytes: make_composer_zip(),
+        },
+        &pkg,
+    )
+    .unwrap();
     let coords = PackageCoords::from_name("acme/pkg", "1.0.0").unwrap();
     // corrompe um arquivo (store é read-only → reabilita escrita primeiro)
     let f = store.package_path(&coords).join("composer.json");
@@ -334,9 +409,19 @@ fn acquire_package_repairs_corrupt_store_entry() {
     std::fs::write(&f, b"CORROMPIDO").unwrap();
     assert!(store.verify(&coords).is_err());
     // re-adquire: deve curar
-    acquire::acquire_package(&store, &StaticFetcher { bytes: make_composer_zip() }, &pkg).unwrap();
+    acquire::acquire_package(
+        &store,
+        &StaticFetcher {
+            bytes: make_composer_zip(),
+        },
+        &pkg,
+    )
+    .unwrap();
     store.verify(&coords).unwrap();
-    assert_eq!(std::fs::read(store.package_path(&coords).join("composer.json")).unwrap(), b"{\"name\":\"acme/pkg\"}");
+    assert_eq!(
+        std::fs::read(store.package_path(&coords).join("composer.json")).unwrap(),
+        b"{\"name\":\"acme/pkg\"}"
+    );
 }
 
 #[test]
@@ -344,8 +429,11 @@ fn acquire_package_errors_when_no_source() {
     let tmp = tempfile::TempDir::new().unwrap();
     let store = Store::new(tmp.path());
     let pkg = LockedPackage {
-        name: "acme/nada".into(), version: "1.0.0".into(), package_type: "library".into(),
-        dist: None, source: None,
+        name: "acme/nada".into(),
+        version: "1.0.0".into(),
+        package_type: "library".into(),
+        dist: None,
+        source: None,
     };
     let err = acquire::acquire_package(&store, &StaticFetcher { bytes: vec![] }, &pkg).unwrap_err();
     assert!(matches!(err, acquire::AcquireError::NoSource(_)));
@@ -357,9 +445,20 @@ fn acquire_package_falls_back_to_git_when_dist_url_none() {
     let tmp = tempfile::TempDir::new().unwrap();
     let store = Store::new(tmp.path());
     let pkg = LockedPackage {
-        name: "acme/fallback".into(), version: "1.0.0".into(), package_type: "library".into(),
-        dist: Some(Dist { dist_type: "zip".into(), url: None, reference: "r".into(), shasum: String::new() }),
-        source: Some(Source { source_type: "git".into(), url: Some(format!("file://{}", repo.path().display())), reference: sha }),
+        name: "acme/fallback".into(),
+        version: "1.0.0".into(),
+        package_type: "library".into(),
+        dist: Some(Dist {
+            dist_type: "zip".into(),
+            url: None,
+            reference: "r".into(),
+            shasum: String::new(),
+        }),
+        source: Some(Source {
+            source_type: "git".into(),
+            url: Some(format!("file://{}", repo.path().display())),
+            reference: sha,
+        }),
     };
     acquire::acquire_package(&store, &StaticFetcher { bytes: vec![] }, &pkg).unwrap();
     let coords = PackageCoords::from_name("acme/fallback", "1.0.0").unwrap();

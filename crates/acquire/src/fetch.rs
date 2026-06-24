@@ -30,7 +30,9 @@ impl Fetcher for HttpFetcher {
         let resp = resp
             .error_for_status()
             .map_err(|e| AcquireError::Http(e.to_string()))?;
-        let bytes = resp.bytes().map_err(|e| AcquireError::Http(e.to_string()))?;
+        let bytes = resp
+            .bytes()
+            .map_err(|e| AcquireError::Http(e.to_string()))?;
         Ok(bytes.to_vec())
     }
 }

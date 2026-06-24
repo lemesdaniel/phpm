@@ -25,7 +25,10 @@ fn parses_first_package_dist_and_source() {
 
     let source = pkg.source.as_ref().expect("tem source");
     assert_eq!(source.source_type, "git");
-    assert_eq!(source.url.as_deref(), Some("https://github.com/php-fig/log.git"));
+    assert_eq!(
+        source.url.as_deref(),
+        Some("https://github.com/php-fig/log.git")
+    );
 }
 
 #[test]
@@ -47,7 +50,10 @@ fn parses_dev_packages_and_ignores_unknown_fields() {
 fn dist_url_is_optional() {
     let lock = parse_lock(NULL_URL).expect("deve parsear mesmo com url null");
     let no_url = &lock.packages[0];
-    assert!(no_url.dist.as_ref().unwrap().url.is_none(), "url null → None");
+    assert!(
+        no_url.dist.as_ref().unwrap().url.is_none(),
+        "url null → None"
+    );
     let with_url = &lock.packages[1];
     assert_eq!(
         with_url.dist.as_ref().unwrap().url.as_deref(),

@@ -5,7 +5,7 @@ Cargo.lock.bak
 
 # RFC e planos de implementação — não versionados (decisão do autor)
 /RFC-*.md
-/docs/superpowers/plans/
+/docs/
 
 # Ambiente
 .DS_Store

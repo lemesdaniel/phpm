@@ -1,5 +1,7 @@
 use std::fs;
 use store::{sha256_tree, PackageCoords, Store};
+#[allow(unused_imports)]
+use store::PackageLock;
 use tempfile::TempDir;
 
 /// Cria um diretório-fonte fake (simula pacote já extraído) e devolve o TempDir.
@@ -77,6 +79,36 @@ fn coords() -> PackageCoords {
         package: "monolog".into(),
         version: "3.8.1".into(),
     }
+}
+
+#[test]
+fn two_shared_locks_coexist() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let l1 = store.lock_shared(&coords()).unwrap();
+    let l2 = store.lock_shared(&coords()).unwrap();
+    // ambos os locks compartilhados são adquiridos sem bloquear
+    drop(l1);
+    drop(l2);
+}
+
+#[test]
+fn exclusive_lock_blocks_try_shared() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let _excl = store.lock_exclusive(&coords()).unwrap();
+    // try_lock_shared no MESMO arquivo de lock, via segundo handle, deve falhar
+    let second = store.try_lock_shared(&coords());
+    assert!(second.is_none(), "shared não deve ser adquirido sob exclusive");
+}
+
+#[test]
+fn lock_file_lives_under_locks_dir() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let _l = store.lock_exclusive(&coords()).unwrap();
+    let lock_file = tmp.path().join("locks/monolog__monolog__3.8.1.lock");
+    assert!(lock_file.exists());
 }
 
 #[test]

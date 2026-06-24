@@ -3,7 +3,9 @@
 mod hash;
 mod atomic;
 mod verify;
+mod lock;
 pub use hash::sha256_tree;
+pub use lock::PackageLock;
 
 use std::path::{Path, PathBuf};
 

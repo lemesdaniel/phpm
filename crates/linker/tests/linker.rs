@@ -1,4 +1,5 @@
 use linker::materialize::{materialize_package, LinkMode};
+use linker::reconcile::current_vendor_packages;
 use linker::sentinel::{read_sentinel, write_sentinel};
 use linker::{sync, SyncReport};
 use lockfile::ComposerLock;
@@ -123,4 +124,34 @@ fn sentinel_corrupt_file_reads_as_none() {
     // garbage / non-JSON content → treated as absent so sync re-reconciles instead of erroring
     std::fs::write(vendor.join(".phpm-state"), b"not json {{{").unwrap();
     assert_eq!(read_sentinel(&vendor).unwrap(), None);
+}
+
+#[test]
+fn current_vendor_packages_lists_materialized_dirs() {
+    let project = TempDir::new().unwrap();
+    let vendor = project.path().join("vendor");
+    std::fs::create_dir_all(vendor.join("acme/pkg")).unwrap();
+    std::fs::create_dir_all(vendor.join("monolog/monolog")).unwrap();
+    // non-package noise that must be ignored
+    std::fs::create_dir_all(vendor.join("composer")).unwrap();
+    std::fs::create_dir_all(vendor.join("bin")).unwrap();
+    std::fs::write(vendor.join(".phpm-state"), b"{}").unwrap();
+    std::fs::write(vendor.join("autoload.php"), b"<?php").unwrap();
+
+    let mut got = current_vendor_packages(&vendor).unwrap();
+    got.sort();
+    assert_eq!(
+        got,
+        vec![
+            ("acme".to_string(), "pkg".to_string()),
+            ("monolog".to_string(), "monolog".to_string()),
+        ]
+    );
+}
+
+#[test]
+fn current_vendor_packages_empty_when_no_vendor() {
+    let project = TempDir::new().unwrap();
+    let vendor = project.path().join("vendor");
+    assert!(current_vendor_packages(&vendor).unwrap().is_empty());
 }

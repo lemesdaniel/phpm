@@ -38,19 +38,24 @@ impl Store {
     }
 
     /// Lock exclusivo — para escrita no store e para o GC. Bloqueia.
+    // M5 adicionará try_lock_exclusive para o GC pular pacotes em uso.
     pub fn lock_exclusive(&self, coords: &PackageCoords) -> Result<PackageLock, StoreError> {
         let file = self.open_lock_file(coords)?;
         FileExt::lock_exclusive(&file)?;
         Ok(PackageLock { _file: file })
     }
 
-    /// Tenta o lock compartilhado sem bloquear. None se já há exclusive ativo.
-    pub fn try_lock_shared(&self, coords: &PackageCoords) -> Option<PackageLock> {
-        let file = self.open_lock_file(coords).ok()?;
-        // try_lock_shared returns Ok(true) if acquired, Ok(false) if contended
+    /// Tenta o lock compartilhado sem bloquear.
+    /// Ok(None) = exclusive ativo (contenção); Err = falha real de io.
+    pub fn try_lock_shared(
+        &self,
+        coords: &PackageCoords,
+    ) -> Result<Option<PackageLock>, StoreError> {
+        let file = self.open_lock_file(coords)?;
         match FileExt::try_lock_shared(&file) {
-            Ok(true) => Some(PackageLock { _file: file }),
-            _ => None,
+            Ok(true) => Ok(Some(PackageLock { _file: file })),
+            Ok(false) => Ok(None),
+            Err(e) => Err(StoreError::Io(e)),
         }
     }
 }

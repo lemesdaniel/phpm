@@ -114,3 +114,13 @@ fn sentinel_absent_when_vendor_missing() {
     let vendor = project.path().join("vendor"); // not created
     assert_eq!(read_sentinel(&vendor).unwrap(), None);
 }
+
+#[test]
+fn sentinel_corrupt_file_reads_as_none() {
+    let project = TempDir::new().unwrap();
+    let vendor = project.path().join("vendor");
+    std::fs::create_dir_all(&vendor).unwrap();
+    // garbage / non-JSON content → treated as absent so sync re-reconciles instead of erroring
+    std::fs::write(vendor.join(".phpm-state"), b"not json {{{").unwrap();
+    assert_eq!(read_sentinel(&vendor).unwrap(), None);
+}

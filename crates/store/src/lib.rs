@@ -1,5 +1,8 @@
 //! Store global do PHPM: layout, integridade, atomicidade e locks.
 
+mod hash;
+pub use hash::sha256_tree;
+
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, thiserror::Error)]

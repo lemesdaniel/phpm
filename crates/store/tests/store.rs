@@ -1,4 +1,5 @@
-use store::{PackageCoords, Store};
+use std::fs;
+use store::{sha256_tree, PackageCoords, Store};
 use tempfile::TempDir;
 
 fn coords() -> PackageCoords {
@@ -61,4 +62,43 @@ fn meta_path_preserves_full_version() {
         "meta_path was: {}",
         p.display()
     );
+}
+
+#[test]
+fn tree_hash_is_stable_and_order_independent() {
+    let a = TempDir::new().unwrap();
+    fs::create_dir_all(a.path().join("src")).unwrap();
+    fs::write(a.path().join("src/Logger.php"), b"<?php class Logger {}").unwrap();
+    fs::write(a.path().join("composer.json"), b"{}").unwrap();
+
+    let b = TempDir::new().unwrap();
+    // mesmos arquivos, criados em ordem inversa
+    fs::write(b.path().join("composer.json"), b"{}").unwrap();
+    fs::create_dir_all(b.path().join("src")).unwrap();
+    fs::write(b.path().join("src/Logger.php"), b"<?php class Logger {}").unwrap();
+
+    assert_eq!(sha256_tree(a.path()).unwrap(), sha256_tree(b.path()).unwrap());
+}
+
+#[test]
+fn tree_hash_changes_with_content() {
+    let a = TempDir::new().unwrap();
+    fs::write(a.path().join("f.php"), b"one").unwrap();
+    let h1 = sha256_tree(a.path()).unwrap();
+    fs::write(a.path().join("f.php"), b"two").unwrap();
+    let h2 = sha256_tree(a.path()).unwrap();
+    assert_ne!(h1, h2);
+}
+
+#[test]
+fn tree_hash_changes_with_path() {
+    let a = TempDir::new().unwrap();
+    fs::write(a.path().join("a.php"), b"x").unwrap();
+    let h1 = sha256_tree(a.path()).unwrap();
+
+    let b = TempDir::new().unwrap();
+    fs::write(b.path().join("b.php"), b"x").unwrap();
+    let h2 = sha256_tree(b.path()).unwrap();
+    // mesmo conteúdo, nome diferente → hash diferente
+    assert_ne!(h1, h2);
 }

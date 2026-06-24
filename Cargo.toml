@@ -15,3 +15,6 @@ hex = "0.4"
 fs4 = { version = "0.13", features = ["sync"] }
 walkdir = "2"
 tempfile = "3"
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
+zip = "2"
+sha1 = "0.10"

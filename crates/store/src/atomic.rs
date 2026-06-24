@@ -19,17 +19,25 @@ impl Store {
     /// sob lock antes de chamar).
     pub fn write_package(&self, coords: &PackageCoords, src_dir: &Path) -> Result<(), StoreError> {
         let dest = self.package_path(coords);
-        if dest.exists() {
-            return Err(StoreError::AlreadyExists(format!(
-                "{}/{}@{}",
-                coords.vendor, coords.package, coords.version
-            )));
+        if dest.is_dir() {
+            if self.meta_path(coords).exists() {
+                // instalação completa → não reescreve
+                return Err(StoreError::AlreadyExists(format!(
+                    "{}/{}@{}",
+                    coords.vendor, coords.package, coords.version
+                )));
+            }
+            // dir presente mas sem meta = instalação parcial (crash entre rename e meta).
+            // Remove o órfão e re-materializa. (Sob lock exclusivo quando Task 10 existir.)
+            // TODO(Task 8): chmod +w antes do remove quando store for read-only
+            fs::remove_dir_all(&dest)?;
         }
 
         let tmp_root = self.root_ref().join("tmp");
         fs::create_dir_all(&tmp_root)?;
         // diretório temporário único por (coords) — sufixo determinístico simples;
         // a unicidade real entre processos é garantida pelo lock exclusivo (Task 10).
+        // TODO(Task 10): nome de staging seguro entre processos exige lock exclusivo
         let staging = tmp_root.join(format!(
             "{}__{}__{}.staging",
             coords.vendor, coords.package, coords.version

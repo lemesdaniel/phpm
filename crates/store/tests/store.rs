@@ -29,6 +29,25 @@ fn write_package_materializes_tree_and_meta() {
     let meta_raw = fs::read_to_string(store.meta_path(&coords())).unwrap();
     assert!(meta_raw.contains("\"sha256\""));
     assert!(meta_raw.contains("monolog/monolog"));
+
+    let meta: serde_json::Value = serde_json::from_str(&meta_raw).unwrap();
+    let sha = meta["sha256"].as_str().unwrap();
+    assert_eq!(sha.len(), 64, "sha256 deve ter 64 chars hex");
+    assert!(sha.chars().all(|c| c.is_ascii_hexdigit()));
+}
+
+#[test]
+fn write_package_reheals_orphaned_dir_without_meta() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    // simula crash: dir do pacote existe mas sem meta
+    fs::create_dir_all(store.package_path(&coords())).unwrap();
+    assert!(!store.meta_path(&coords()).exists());
+    // write deve auto-curar (re-materializar), não erro
+    store.write_package(&coords(), fake_source().path()).unwrap();
+    assert!(store.meta_path(&coords()).exists());
+    let logger = store.package_path(&coords()).join("src/Logger.php");
+    assert_eq!(fs::read(&logger).unwrap(), b"<?php class Logger {}");
 }
 
 #[test]

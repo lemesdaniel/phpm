@@ -16,18 +16,21 @@ pub fn extract_strip_root(zip_bytes: &[u8], dest: &Path) -> Result<(), AcquireEr
             .by_index(i)
             .map_err(|e| AcquireError::Zip(e.to_string()))?;
         let name = file.name().to_string();
+        // checagem nativa de path traversal / absoluto (nível de componente)
+        if file.enclosed_name().is_none() {
+            return Err(AcquireError::Zip(format!("entry insegura: {name}")));
+        }
+        // symlinks em archive: rejeita (M2). zip armazena o alvo como conteúdo;
+        // materializar como arquivo regular corromperia o pacote.
+        if file.is_symlink() {
+            return Err(AcquireError::Zip(format!("symlink rejeitada: {name}")));
+        }
         let rel = match &root {
             Some(prefix) => name.strip_prefix(prefix.as_str()).unwrap_or(&name),
             None => name.as_str(),
         };
         if rel.is_empty() {
             continue; // a própria entrada do dir-raiz
-        }
-        if rel.contains("..") {
-            return Err(AcquireError::Zip(format!("entry suspeita: {name}")));
-        }
-        if rel.starts_with('/') {
-            return Err(AcquireError::Zip(format!("entry com caminho absoluto: {name}")));
         }
         let out = dest.join(rel);
         if file.is_dir() || name.ends_with('/') {
@@ -36,7 +39,8 @@ pub fn extract_strip_root(zip_bytes: &[u8], dest: &Path) -> Result<(), AcquireEr
             if let Some(parent) = out.parent() {
                 std::fs::create_dir_all(parent)?;
             }
-            let mut bytes = Vec::with_capacity(file.size() as usize);
+            let cap = (file.size() as usize).min(64 * 1024 * 1024);
+            let mut bytes = Vec::with_capacity(cap);
             file.read_to_end(&mut bytes)
                 .map_err(|e| AcquireError::Zip(e.to_string()))?;
             std::fs::write(&out, bytes)?;
@@ -57,8 +61,8 @@ fn common_root<R: Read + std::io::Seek>(
             .map_err(|e| AcquireError::Zip(e.to_string()))?;
         let name = file.name();
         let first = match name.split_once('/') {
-            Some((head, _)) => head.to_string(),
-            None => return Ok(None),
+            Some((head, _)) if !head.is_empty() => head.to_string(),
+            _ => return Ok(None),
         };
         match &root {
             None => root = Some(first),

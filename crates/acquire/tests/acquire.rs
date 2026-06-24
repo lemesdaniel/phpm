@@ -52,3 +52,52 @@ fn extract_zip_strips_single_root_dir() {
     );
     assert!(!tmp.path().join("acme-pkg-abc123").exists());
 }
+
+#[test]
+fn extract_rejects_zip_slip() {
+    let mut buf = Vec::new();
+    {
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+        let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default();
+        zip.start_file("pkg-root/../../evil.php", opts).unwrap();
+        zip.write_all(b"x").unwrap();
+        zip.finish().unwrap();
+    }
+    let tmp = tempfile::TempDir::new().unwrap();
+    let err = acquire::zipx::extract_strip_root(&buf, tmp.path()).unwrap_err();
+    assert!(matches!(err, acquire::AcquireError::Zip(_)));
+}
+
+#[test]
+fn extract_rejects_symlink_entry() {
+    let mut buf = Vec::new();
+    {
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+        let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default();
+        zip.add_directory("pkg-root/", opts).unwrap();
+        // alvo do symlink como conteúdo (formato zip de symlink unix)
+        zip.add_symlink("pkg-root/link", "../../secret", opts).unwrap();
+        zip.finish().unwrap();
+    }
+    let tmp = tempfile::TempDir::new().unwrap();
+    let err = acquire::zipx::extract_strip_root(&buf, tmp.path()).unwrap_err();
+    assert!(matches!(err, acquire::AcquireError::Zip(_)));
+}
+
+#[test]
+fn extract_without_common_root_is_flat() {
+    let mut buf = Vec::new();
+    {
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+        let opts: zip::write::FileOptions<()> = zip::write::FileOptions::default();
+        zip.start_file("a/x.php", opts).unwrap();
+        zip.write_all(b"a").unwrap();
+        zip.start_file("b/y.php", opts).unwrap();
+        zip.write_all(b"b").unwrap();
+        zip.finish().unwrap();
+    }
+    let tmp = tempfile::TempDir::new().unwrap();
+    acquire::zipx::extract_strip_root(&buf, tmp.path()).unwrap();
+    assert!(tmp.path().join("a/x.php").exists());
+    assert!(tmp.path().join("b/y.php").exists());
+}

@@ -1,0 +1,24 @@
+{
+  "_readme": ["This file locks the dependencies of your project to a known state"],
+  "content-hash": "a1b2c3d4e5f6",
+  "packages": [
+    {
+      "name": "psr/log",
+      "version": "3.0.0",
+      "type": "library",
+      "dist": {
+        "type": "zip",
+        "url": "https://api.github.com/repos/php-fig/log/zipball/abc123",
+        "reference": "abc123",
+        "shasum": ""
+      },
+      "source": {
+        "type": "git",
+        "url": "https://github.com/php-fig/log.git",
+        "reference": "abc123"
+      }
+    }
+  ],
+  "packages-dev": [],
+  "plugin-api-version": "2.6.0"
+}

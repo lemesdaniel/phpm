@@ -1,5 +1,7 @@
 use acquire::{AcquireError, Fetcher};
+use lockfile::Dist;
 use std::io::Write;
+use store::{PackageCoords, Store};
 
 /// Fetcher de teste que devolve bytes fixos, sem rede.
 struct StaticFetcher {
@@ -98,6 +100,42 @@ fn shasum_ok_when_matches_and_skips_when_empty() {
 fn shasum_err_on_mismatch() {
     let err = acquire::shasum::verify_sha1(b"hello world", "0000").unwrap_err();
     assert!(matches!(err, acquire::AcquireError::Shasum { .. }));
+}
+
+#[test]
+fn acquire_dist_writes_package_to_store() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let coords = PackageCoords {
+        vendor: "acme".into(),
+        package: "pkg".into(),
+        version: "1.0.0".into(),
+    };
+    let dist = Dist {
+        dist_type: "zip".into(),
+        url: Some("http://example/acme-pkg.zip".into()),
+        reference: "abc123".into(),
+        shasum: String::new(),
+    };
+    let fetcher = StaticFetcher { bytes: make_composer_zip() };
+
+    acquire::dist::acquire_dist(&store, &fetcher, &coords, &dist).unwrap();
+
+    assert!(store.has(&coords));
+    store.verify(&coords).unwrap();
+    let composer = store.package_path(&coords).join("composer.json");
+    assert_eq!(std::fs::read(&composer).unwrap(), b"{\"name\":\"acme/pkg\"}");
+}
+
+#[test]
+fn acquire_dist_errors_without_url() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let coords = PackageCoords { vendor: "acme".into(), package: "pkg".into(), version: "1.0.0".into() };
+    let dist = Dist { dist_type: "zip".into(), url: None, reference: "r".into(), shasum: String::new() };
+    let fetcher = StaticFetcher { bytes: vec![] };
+    let err = acquire::dist::acquire_dist(&store, &fetcher, &coords, &dist).unwrap_err();
+    assert!(matches!(err, acquire::AcquireError::NoSource(_)));
 }
 
 #[test]

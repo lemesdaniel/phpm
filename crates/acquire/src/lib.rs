@@ -1,6 +1,7 @@
 //! Aquisição de pacotes: baixa dist ou clona git source para o store global.
 
 mod fetch;
+pub mod dist;
 pub mod shasum;
 pub mod zipx;
 

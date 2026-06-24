@@ -70,6 +70,19 @@ fn write_package_twice_errors_already_exists() {
 }
 
 #[test]
+fn remove_package_clears_dir_and_meta() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    store.write_package(&coords(), fake_source().path()).unwrap();
+    assert!(store.has(&coords()));
+    store.remove_package(&coords()).unwrap();
+    assert!(!store.has(&coords()));
+    assert!(!store.meta_path(&coords()).exists());
+    // remover de novo (ausente) é no-op, sem erro
+    store.remove_package(&coords()).unwrap();
+}
+
+#[test]
 fn write_package_leaves_no_temp_on_success() {
     let tmp = TempDir::new().unwrap();
     let store = Store::new(tmp.path());

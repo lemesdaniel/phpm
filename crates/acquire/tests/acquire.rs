@@ -312,3 +312,56 @@ fn acquire_package_skips_platform_packages() {
     };
     acquire::acquire_package(&store, &StaticFetcher { bytes: vec![] }, &php).unwrap();
 }
+
+#[test]
+#[cfg(unix)]
+fn acquire_package_repairs_corrupt_store_entry() {
+    use std::os::unix::fs::PermissionsExt;
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let pkg = LockedPackage {
+        name: "acme/pkg".into(), version: "1.0.0".into(), package_type: "library".into(),
+        dist: Some(Dist { dist_type: "zip".into(), url: Some("http://x/p.zip".into()), reference: "a".into(), shasum: String::new() }),
+        source: None,
+    };
+    acquire::acquire_package(&store, &StaticFetcher { bytes: make_composer_zip() }, &pkg).unwrap();
+    let coords = PackageCoords::from_name("acme/pkg", "1.0.0").unwrap();
+    // corrompe um arquivo (store é read-only → reabilita escrita primeiro)
+    let f = store.package_path(&coords).join("composer.json");
+    let mut perms = std::fs::metadata(&f).unwrap().permissions();
+    perms.set_mode(0o644);
+    std::fs::set_permissions(&f, perms).unwrap();
+    std::fs::write(&f, b"CORROMPIDO").unwrap();
+    assert!(store.verify(&coords).is_err());
+    // re-adquire: deve curar
+    acquire::acquire_package(&store, &StaticFetcher { bytes: make_composer_zip() }, &pkg).unwrap();
+    store.verify(&coords).unwrap();
+    assert_eq!(std::fs::read(store.package_path(&coords).join("composer.json")).unwrap(), b"{\"name\":\"acme/pkg\"}");
+}
+
+#[test]
+fn acquire_package_errors_when_no_source() {
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let pkg = LockedPackage {
+        name: "acme/nada".into(), version: "1.0.0".into(), package_type: "library".into(),
+        dist: None, source: None,
+    };
+    let err = acquire::acquire_package(&store, &StaticFetcher { bytes: vec![] }, &pkg).unwrap_err();
+    assert!(matches!(err, acquire::AcquireError::NoSource(_)));
+}
+
+#[test]
+fn acquire_package_falls_back_to_git_when_dist_url_none() {
+    let (repo, sha) = make_git_repo();
+    let tmp = tempfile::TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let pkg = LockedPackage {
+        name: "acme/fallback".into(), version: "1.0.0".into(), package_type: "library".into(),
+        dist: Some(Dist { dist_type: "zip".into(), url: None, reference: "r".into(), shasum: String::new() }),
+        source: Some(Source { source_type: "git".into(), url: Some(format!("file://{}", repo.path().display())), reference: sha }),
+    };
+    acquire::acquire_package(&store, &StaticFetcher { bytes: vec![] }, &pkg).unwrap();
+    let coords = PackageCoords::from_name("acme/fallback", "1.0.0").unwrap();
+    assert!(store.has(&coords));
+}

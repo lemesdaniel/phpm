@@ -77,6 +77,22 @@ impl Store {
 
         Ok(())
     }
+
+    /// Remove um pacote do store (dir + meta). Reabilita escrita antes (store é
+    /// read-only). Caller deve segurar o lock exclusivo. No-op se ausente.
+    /// Base para o GC (M5) e para reparo de entrada corrompida.
+    pub fn remove_package(&self, coords: &PackageCoords) -> Result<(), StoreError> {
+        let dest = self.package_path(coords);
+        if dest.exists() {
+            set_writable_recursive(&dest)?;
+            fs::remove_dir_all(&dest)?;
+        }
+        let meta = self.meta_path(coords);
+        if meta.exists() {
+            fs::remove_file(&meta)?;
+        }
+        Ok(())
+    }
 }
 
 fn copy_tree(src: &Path, dst: &Path) -> Result<(), StoreError> {

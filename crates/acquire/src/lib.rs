@@ -46,8 +46,13 @@ pub fn acquire_package(
     // lock exclusivo ANTES de checar/escrever — evita TOCTOU entre installs paralelos.
     let _lock = store.lock_exclusive(&coords)?;
 
-    if store.has(&coords) && store.verify(&coords).is_ok() {
-        return Ok(());
+    if store.has(&coords) {
+        if store.verify(&coords).is_ok() {
+            return Ok(());
+        }
+        // presente mas corrompido (sha diverge / meta inconsistente) →
+        // remove para permitir re-materialização limpa (sob o lock exclusivo).
+        store.remove_package(&coords)?;
     }
 
     if let Some(dist) = &pkg.dist {

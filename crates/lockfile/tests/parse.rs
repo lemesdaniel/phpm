@@ -2,6 +2,7 @@ use lockfile::parse_lock;
 
 const MINIMAL: &str = include_str!("fixtures/minimal.lock.json");
 const WITH_DEV: &str = include_str!("fixtures/with-dev.lock.json");
+const NULL_URL: &str = include_str!("fixtures/null-url.lock.json");
 
 #[test]
 fn parses_content_hash() {
@@ -24,7 +25,10 @@ fn parses_first_package_dist_and_source() {
 
     let source = pkg.source.as_ref().expect("tem source");
     assert_eq!(source.source_type, "git");
-    assert_eq!(source.url, "https://github.com/php-fig/log.git");
+    assert_eq!(
+        source.url.as_deref(),
+        Some("https://github.com/php-fig/log.git")
+    );
 }
 
 #[test]
@@ -40,4 +44,19 @@ fn parses_dev_packages_and_ignores_unknown_fields() {
     assert_eq!(lock.packages[0].package_type, "library");
     // plugin-api-version ausente → string vazia (default), sem erro
     assert_eq!(lock.plugin_api_version, "");
+}
+
+#[test]
+fn dist_url_is_optional() {
+    let lock = parse_lock(NULL_URL).expect("deve parsear mesmo com url null");
+    let no_url = &lock.packages[0];
+    assert!(
+        no_url.dist.as_ref().unwrap().url.is_none(),
+        "url null → None"
+    );
+    let with_url = &lock.packages[1];
+    assert_eq!(
+        with_url.dist.as_ref().unwrap().url.as_deref(),
+        Some("https://x/y.zip")
+    );
 }

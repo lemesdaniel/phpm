@@ -30,7 +30,8 @@ fn default_type() -> String {
 pub struct Dist {
     #[serde(rename = "type")]
     pub dist_type: String,
-    pub url: String,
+    #[serde(default)]
+    pub url: Option<String>,
     #[serde(default)]
     pub reference: String,
     #[serde(default)]
@@ -41,7 +42,8 @@ pub struct Dist {
 pub struct Source {
     #[serde(rename = "type")]
     pub source_type: String,
-    pub url: String,
+    #[serde(default)]
+    pub url: Option<String>,
     #[serde(default)]
     pub reference: String,
 }

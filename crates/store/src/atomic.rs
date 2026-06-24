@@ -38,7 +38,7 @@ impl Store {
         fs::create_dir_all(&tmp_root)?;
         // diretório temporário único por (coords) — sufixo determinístico simples;
         // a unicidade real entre processos é garantida pelo lock exclusivo (Task 10).
-        // TODO(Task 10): nome de staging seguro entre processos exige lock exclusivo
+        // Unicidade entre processos garantida pelo lock exclusivo que o caller (acquire_package) segura desde M2.
         let staging = tmp_root.join(format!(
             "{}__{}__{}.staging",
             coords.vendor, coords.package, coords.version
@@ -75,6 +75,22 @@ impl Store {
         }
         fs::write(&meta_path, serde_json::to_vec_pretty(&meta)?)?;
 
+        Ok(())
+    }
+
+    /// Remove um pacote do store (dir + meta). Reabilita escrita antes (store é
+    /// read-only). Caller deve segurar o lock exclusivo. No-op se ausente.
+    /// Base para o GC (M5) e para reparo de entrada corrompida.
+    pub fn remove_package(&self, coords: &PackageCoords) -> Result<(), StoreError> {
+        let dest = self.package_path(coords);
+        if dest.exists() {
+            set_writable_recursive(&dest)?;
+            fs::remove_dir_all(&dest)?;
+        }
+        let meta = self.meta_path(coords);
+        if meta.exists() {
+            fs::remove_file(&meta)?;
+        }
         Ok(())
     }
 }

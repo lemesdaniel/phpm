@@ -102,3 +102,10 @@ fn tree_hash_changes_with_path() {
     // mesmo conteúdo, nome diferente → hash diferente
     assert_ne!(h1, h2);
 }
+
+#[test]
+fn tree_hash_empty_dir_is_stable() {
+    let a = TempDir::new().unwrap();
+    let b = TempDir::new().unwrap();
+    assert_eq!(sha256_tree(a.path()).unwrap(), sha256_tree(b.path()).unwrap());
+}

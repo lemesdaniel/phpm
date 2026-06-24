@@ -7,6 +7,8 @@ use walkdir::WalkDir;
 /// Ordena os arquivos pelo caminho relativo (com `/` normalizado) e mistura,
 /// para cada arquivo: caminho relativo, tamanho e bytes. Independente da
 /// ordem de criação no FS e da plataforma (separador normalizado).
+/// Assume nomes de arquivo UTF-8 (pacotes Composer usam ASCII na prática);
+/// não aplica normalização Unicode NFC/NFD — fora do escopo M1.
 pub fn sha256_tree(root: &Path) -> io::Result<String> {
     let mut files: Vec<(String, std::path::PathBuf)> = Vec::new();
     for entry in WalkDir::new(root).follow_links(false) {
@@ -18,7 +20,8 @@ pub fn sha256_tree(root: &Path) -> io::Result<String> {
             .path()
             .strip_prefix(root)
             .map_err(io::Error::other)?
-            .to_string_lossy()
+            .to_str()
+            .ok_or_else(|| io::Error::other("caminho não-UTF-8 no pacote"))?
             .replace('\\', "/");
         files.push((rel, entry.path().to_path_buf()));
     }

@@ -128,6 +128,18 @@ fn acquire_dist_writes_package_to_store() {
 }
 
 #[test]
+#[ignore = "rede: rode com --ignored quando quiser validar download real"]
+fn http_fetcher_downloads_real_dist() {
+    use acquire::HttpFetcher;
+    use acquire::Fetcher;
+    let url = "https://api.github.com/repos/php-fig/log/zipball/79dff0b268932c640297f5208d6298f71855c03e";
+    let fetcher = HttpFetcher::new().unwrap();
+    let bytes = fetcher.fetch(url).unwrap();
+    assert!(bytes.len() > 1000, "deve baixar um zip não-trivial");
+    assert_eq!(&bytes[0..2], b"PK");
+}
+
+#[test]
 fn acquire_dist_errors_without_url() {
     let tmp = tempfile::TempDir::new().unwrap();
     let store = Store::new(tmp.path());

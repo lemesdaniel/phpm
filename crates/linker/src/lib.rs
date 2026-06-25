@@ -42,10 +42,18 @@ pub fn sync(
     let vendor = project_dir.join("vendor");
     std::fs::create_dir_all(&vendor)?;
 
+    // Encodes both content_hash and whether dev packages are present so a full→no-dev (or
+    // no-dev→full) switch on the same lock is a cache miss that triggers a full reconcile.
+    let sentinel_key = format!(
+        "{}|dev={}",
+        lock.content_hash,
+        !lock.packages_dev.is_empty()
+    );
+
     // Fast path: the sentinel records this exact lock → assume materialized, skip the walk.
     // An empty content_hash (lock missing it) is never trusted, else it would mask all changes.
     if !lock.content_hash.is_empty()
-        && read_sentinel(&vendor)?.as_deref() == Some(lock.content_hash.as_str())
+        && read_sentinel(&vendor)?.as_deref() == Some(sentinel_key.as_str())
     {
         return Ok(SyncReport {
             no_op: true,
@@ -82,7 +90,7 @@ pub fn sync(
     }
 
     // Sentinel written last: only exists once vendor matches the lock.
-    write_sentinel(&vendor, &lock.content_hash)?;
+    write_sentinel(&vendor, &sentinel_key)?;
     Ok(report)
 }
 

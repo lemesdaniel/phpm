@@ -2,7 +2,9 @@ use crate::{BridgeError, Runner};
 use std::path::Path;
 
 /// `composer update --no-install --no-scripts` — re-resolve and rewrite composer.lock;
-/// never touch vendor/ and never run post-update-cmd (phpm runs scripts after install).
+/// never touch vendor/.
+// --no-scripts: phpm runs only post-autoload-dump itself (after generate). post-install-cmd /
+// post-update-cmd (e.g. Laravel key:generate, storage:link) are NOT run — known limitation, see backlog.
 pub fn update(runner: &dyn Runner, project_dir: &Path) -> Result<(), BridgeError> {
     runner.run(
         "composer",

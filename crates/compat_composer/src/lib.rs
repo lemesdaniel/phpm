@@ -4,6 +4,7 @@
 
 pub mod aggregate;
 pub mod classmap;
+pub mod installed;
 pub mod php_emit;
 
 #[derive(Debug, thiserror::Error)]

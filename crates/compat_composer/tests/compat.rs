@@ -1,6 +1,7 @@
 use compat_composer::GenError;
 use compat_composer::aggregate::{aggregate_autoload, AutoloadData, PathBase};
 use compat_composer::classmap::{classmap_for_package, scan_php_classes};
+use compat_composer::installed::{render_installed_php, render_installed_json, InstalledPackage};
 use compat_composer::php_emit::{render_psr4_php, render_files_php, render_classmap_php, render_autoload_real, render_autoload_entry};
 use lockfile::{Autoload, ComposerJson};
 use std::collections::BTreeMap;
@@ -186,4 +187,40 @@ fn autoload_entry_returns_getloader() {
     assert!(php.starts_with("<?php"));
     assert!(php.contains("require_once __DIR__ . '/composer/autoload_real.php';"));
     assert!(php.contains("return ComposerAutoloaderInitphpm00000000000000000000000000000::getLoader();"));
+}
+
+fn pkg_row(name: &str, ver: &str) -> InstalledPackage {
+    InstalledPackage {
+        name: name.into(), version: ver.into(),
+        package_type: "library".into(), reference: "abc123".into(),
+    }
+}
+
+#[test]
+fn installed_php_contains_root_and_versions() {
+    let pkgs = vec![pkg_row("monolog/monolog", "3.8.1")];
+    let php = render_installed_php("acme/app", "1.0.0+no-version-set", &pkgs);
+    assert!(php.starts_with("<?php"));
+    assert!(php.contains("'root' => array("));
+    assert!(php.contains("'name' => 'acme/app',"));
+    assert!(php.contains("'versions' => array("));
+    assert!(php.contains("'monolog/monolog' => array("));
+    assert!(php.contains("'pretty_version' => '3.8.1',"));
+    assert!(php.contains("'version' => '3.8.1.0',")); // normalized
+    assert!(php.contains("'type' => 'library',"));
+}
+
+#[test]
+fn installed_json_carries_extra_for_discovery() {
+    let pkgs = vec![pkg_row("acme/provider", "1.0.0")];
+    let mut extras: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+    extras.insert(
+        "acme/provider".into(),
+        serde_json::json!({ "laravel": { "providers": ["Acme\\ServiceProvider"] } }),
+    );
+    let json = render_installed_json(&pkgs, &extras);
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["packages"][0]["name"], "acme/provider");
+    assert_eq!(parsed["packages"][0]["version"], "1.0.0");
+    assert_eq!(parsed["packages"][0]["extra"]["laravel"]["providers"][0], "Acme\\ServiceProvider");
 }

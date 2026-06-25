@@ -17,12 +17,8 @@ pub enum BridgeError {
         program: String,
         source: std::io::Error,
     },
-    #[error("{program} {args:?} failed: {stderr}")]
-    Failed {
-        program: String,
-        args: Vec<String>,
-        stderr: String,
-    },
+    #[error("{program} {args:?} failed (see output above)")]
+    Failed { program: String, args: Vec<String> },
     #[error("I/O: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -37,19 +33,19 @@ pub struct SystemRunner;
 
 impl Runner for SystemRunner {
     fn run(&self, program: &str, args: &[&str], cwd: &Path) -> Result<(), BridgeError> {
-        let out = Command::new(program)
+        // Inherit parent stdio so Composer output streams live to the terminal.
+        let status = Command::new(program)
             .args(args)
             .current_dir(cwd)
-            .output()
+            .status()
             .map_err(|source| BridgeError::Spawn {
                 program: program.to_string(),
                 source,
             })?;
-        if !out.status.success() {
+        if !status.success() {
             return Err(BridgeError::Failed {
                 program: program.to_string(),
                 args: args.iter().map(|s| s.to_string()).collect(),
-                stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
             });
         }
         Ok(())

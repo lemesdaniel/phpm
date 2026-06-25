@@ -64,6 +64,7 @@ fn run(cli: Cli) -> Result<(), cli::install::CliError> {
                 no_dev,
             };
             if !project_dir.join("composer.lock").exists() {
+                eprintln!("phpm: resolving dependencies with composer");
                 composer_bridge::update(&runner, &project_dir)?;
             }
             let report = cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;
@@ -76,6 +77,7 @@ fn run(cli: Cli) -> Result<(), cli::install::CliError> {
                 registry_base: cli::registry_base(),
                 no_dev,
             };
+            eprintln!("phpm: resolving dependencies with composer");
             composer_bridge::require(&runner, &project_dir, &packages)?;
             // composer just re-resolved the lock, staleness is expected-resolved
             cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;
@@ -85,6 +87,7 @@ fn run(cli: Cli) -> Result<(), cli::install::CliError> {
                 registry_base: cli::registry_base(),
                 no_dev,
             };
+            eprintln!("phpm: resolving dependencies with composer");
             composer_bridge::remove(&runner, &project_dir, &packages)?;
             // composer just re-resolved the lock, staleness is expected-resolved
             cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;
@@ -94,6 +97,7 @@ fn run(cli: Cli) -> Result<(), cli::install::CliError> {
                 registry_base: cli::registry_base(),
                 no_dev,
             };
+            eprintln!("phpm: resolving dependencies with composer");
             composer_bridge::update(&runner, &project_dir)?;
             // composer just re-resolved the lock, staleness is expected-resolved
             cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;

@@ -364,6 +364,24 @@ fn scan_handles_global_namespace() {
 }
 
 #[test]
+fn scan_skips_class_decls_inside_heredoc() {
+    // A file that contains a class-declaration-looking string inside a heredoc/nowdoc
+    // must not produce false classmap entries for the content of the heredoc.
+    let dir = tempfile::TempDir::new().unwrap();
+    fs::write(
+        dir.path().join("Template.php"),
+        b"<?php\nnamespace Acme;\nclass Template {\n    private const PHP = <<<'PHP'\n        namespace Fake;\n        final class FakeClass {}\n        PHP;\n}\n",
+    ).unwrap();
+    let found = scan_php_classes(dir.path()).unwrap();
+    // Only Template should appear; FakeClass is inside the heredoc string.
+    assert!(found.contains_key("Acme\\Template"), "should find Template");
+    assert!(
+        !found.contains_key("Fake\\FakeClass"),
+        "FakeClass is inside heredoc — must not appear in classmap"
+    );
+}
+
+#[test]
 fn classmap_cache_keeps_full_version_and_round_trips() {
     use store::{PackageCoords, Store};
     let store_dir = tempfile::TempDir::new().unwrap();

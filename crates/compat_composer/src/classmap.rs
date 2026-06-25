@@ -30,7 +30,12 @@ pub fn scan_php_classes(root: &Path) -> Result<BTreeMap<String, String>, GenErro
             .map_err(|e| GenError::Io(std::io::Error::other(e)))?
             .to_string_lossy()
             .replace('\\', "/");
-        let src = std::fs::read_to_string(entry.path())?;
+        // Skip files that aren't valid UTF-8 (binary assets, non-UTF-8 encodings).
+        let bytes = std::fs::read(entry.path())?;
+        let src = match String::from_utf8(bytes) {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
         for fqcn in classes_in_source(&src) {
             out.insert(fqcn, rel.clone());
         }
@@ -41,7 +46,32 @@ pub fn scan_php_classes(root: &Path) -> Result<BTreeMap<String, String>, GenErro
 fn classes_in_source(src: &str) -> Vec<String> {
     let mut namespace = String::new();
     let mut names = Vec::new();
+    // Track heredoc/nowdoc state: Some(terminator) while inside a heredoc.
+    let mut heredoc: Option<String> = None;
     for raw in src.lines() {
+        // Heredoc exit: a line whose trimmed content is the terminator (with optional trailing `;`).
+        // PHP 7.3+ allows the terminator to be indented.
+        if let Some(ref term) = heredoc {
+            let trimmed = raw.trim().trim_end_matches(';').trim_end();
+            if trimmed == term {
+                heredoc = None;
+            }
+            continue;
+        }
+        // Heredoc entry: `<<<EOT`, `<<<'EOT'`, `<<<"EOT"` — may appear anywhere on a line.
+        if let Some(pos) = raw.find("<<<") {
+            let after = raw[pos + 3..].trim_end();
+            // Strip surrounding quotes for nowdoc / double-quoted heredoc.
+            let ident = after
+                .trim_start_matches('"')
+                .trim_end_matches('"')
+                .trim_start_matches('\'')
+                .trim_end_matches('\'');
+            if !ident.is_empty() && ident.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                heredoc = Some(ident.to_string());
+                continue;
+            }
+        }
         let line = strip_line_comment(raw).trim();
         if let Some(ns) = parse_namespace(line) {
             namespace = ns;

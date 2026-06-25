@@ -107,11 +107,22 @@ pub fn generate(
             name: locked.name.clone(),
             version: locked.version.clone(),
             package_type: locked.package_type.clone(),
+            dist_type: locked
+                .dist
+                .as_ref()
+                .map(|d| d.dist_type.clone())
+                .unwrap_or_default(),
+            dist_url: locked.dist.as_ref().and_then(|d| d.url.clone()),
             reference: locked
                 .dist
                 .as_ref()
                 .map(|d| d.reference.clone())
                 .or_else(|| locked.source.as_ref().map(|s| s.reference.clone()))
+                .unwrap_or_default(),
+            shasum: locked
+                .dist
+                .as_ref()
+                .map(|d| d.shasum.clone())
                 .unwrap_or_default(),
             dev: is_dev,
         });

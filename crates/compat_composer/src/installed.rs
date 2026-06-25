@@ -6,7 +6,10 @@ pub struct InstalledPackage {
     pub name: String,
     pub version: String,
     pub package_type: String,
+    pub dist_type: String,
+    pub dist_url: Option<String>,
     pub reference: String,
+    pub shasum: String,
     pub dev: bool,
 }
 
@@ -110,7 +113,12 @@ pub fn render_installed_json(
                 "version": p.version,
                 "version_normalized": normalize_version(&p.version),
                 "type": p.package_type,
-                "dist": { "reference": p.reference },
+                "dist": {
+                    "type": p.dist_type,
+                    "url": p.dist_url,
+                    "reference": p.reference,
+                    "shasum": p.shasum,
+                },
                 "extra": extras.get(&p.name).cloned().unwrap_or(Value::Null),
             })
         })

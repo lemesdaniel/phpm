@@ -15,13 +15,27 @@ struct Cli {
 enum Commands {
     /// Install from composer.lock. Resolves first only if the lock is missing; a STALE
     /// lock (composer.json changed) is NOT re-resolved — run `phpm update` for that.
-    Install,
+    Install {
+        #[arg(long)]
+        no_dev: bool,
+    },
     /// Add one or more dependencies (delegates resolution to Composer), then install
-    Require { packages: Vec<String> },
+    Require {
+        packages: Vec<String>,
+        #[arg(long)]
+        no_dev: bool,
+    },
     /// Remove one or more dependencies, then install
-    Remove { packages: Vec<String> },
+    Remove {
+        packages: Vec<String>,
+        #[arg(long)]
+        no_dev: bool,
+    },
     /// Re-resolve and update composer.lock, then install
-    Update,
+    Update {
+        #[arg(long)]
+        no_dev: bool,
+    },
     /// Remove unreferenced packages from the global store (dry run unless --prune)
     Gc {
         #[arg(long)]
@@ -42,27 +56,46 @@ fn run(cli: Cli) -> Result<(), cli::install::CliError> {
     let store = store::Store::new(cli::store_dir());
     let fetcher = acquire::HttpFetcher::new()?;
     let runner = composer_bridge::SystemRunner;
-    let opts = cli::install::InstallOpts {
-        registry_base: cli::registry_base(),
-    };
 
     match cli.command {
-        Commands::Install => {
+        Commands::Install { no_dev } => {
+            let opts = cli::install::InstallOpts {
+                registry_base: cli::registry_base(),
+                no_dev,
+            };
             if !project_dir.join("composer.lock").exists() {
                 composer_bridge::update(&runner, &project_dir)?;
             }
-            cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;
+            let report = cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;
+            if report.lock_possibly_stale {
+                eprintln!("phpm: warning: composer.json requires packages not in composer.lock; run `phpm update` to re-resolve");
+            }
         }
-        Commands::Require { packages } => {
+        Commands::Require { packages, no_dev } => {
+            let opts = cli::install::InstallOpts {
+                registry_base: cli::registry_base(),
+                no_dev,
+            };
             composer_bridge::require(&runner, &project_dir, &packages)?;
+            // composer just re-resolved the lock, staleness is expected-resolved
             cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;
         }
-        Commands::Remove { packages } => {
+        Commands::Remove { packages, no_dev } => {
+            let opts = cli::install::InstallOpts {
+                registry_base: cli::registry_base(),
+                no_dev,
+            };
             composer_bridge::remove(&runner, &project_dir, &packages)?;
+            // composer just re-resolved the lock, staleness is expected-resolved
             cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;
         }
-        Commands::Update => {
+        Commands::Update { no_dev } => {
+            let opts = cli::install::InstallOpts {
+                registry_base: cli::registry_base(),
+                no_dev,
+            };
             composer_bridge::update(&runner, &project_dir)?;
+            // composer just re-resolved the lock, staleness is expected-resolved
             cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;
         }
         Commands::Gc { prune } => {

@@ -364,6 +364,24 @@ fn scan_handles_global_namespace() {
 }
 
 #[test]
+fn scan_skips_class_decls_inside_heredoc() {
+    // A file that contains a class-declaration-looking string inside a heredoc/nowdoc
+    // must not produce false classmap entries for the content of the heredoc.
+    let dir = tempfile::TempDir::new().unwrap();
+    fs::write(
+        dir.path().join("Template.php"),
+        b"<?php\nnamespace Acme;\nclass Template {\n    private const PHP = <<<'PHP'\n        namespace Fake;\n        final class FakeClass {}\n        PHP;\n}\n",
+    ).unwrap();
+    let found = scan_php_classes(dir.path()).unwrap();
+    // Only Template should appear; FakeClass is inside the heredoc string.
+    assert!(found.contains_key("Acme\\Template"), "should find Template");
+    assert!(
+        !found.contains_key("Fake\\FakeClass"),
+        "FakeClass is inside heredoc — must not appear in classmap"
+    );
+}
+
+#[test]
 fn classmap_cache_keeps_full_version_and_round_trips() {
     use store::{PackageCoords, Store};
     let store_dir = tempfile::TempDir::new().unwrap();
@@ -427,8 +445,73 @@ fn pkg_row(name: &str, ver: &str) -> InstalledPackage {
         name: name.into(),
         version: ver.into(),
         package_type: "library".into(),
+        dist_type: "zip".into(),
+        dist_url: None,
         reference: "abc123".into(),
+        shasum: String::new(),
+        dev: false,
     }
+}
+
+#[test]
+fn installed_php_dev_requirement_reflects_dev_flag() {
+    let pkgs = vec![
+        InstalledPackage {
+            name: "monolog/monolog".into(),
+            version: "3.8.1".into(),
+            package_type: "library".into(),
+            dist_type: "zip".into(),
+            dist_url: None,
+            reference: "a".into(),
+            shasum: String::new(),
+            dev: false,
+        },
+        InstalledPackage {
+            name: "phpunit/phpunit".into(),
+            version: "11.0.0".into(),
+            package_type: "library".into(),
+            dist_type: "zip".into(),
+            dist_url: None,
+            reference: "b".into(),
+            shasum: String::new(),
+            dev: true,
+        },
+    ];
+    let php = render_installed_php("acme/app", "1.0.0", &pkgs);
+    assert!(php.contains("'dev_requirement' => false,"));
+    assert!(php.contains("'dev_requirement' => true,"));
+}
+
+#[test]
+fn installed_json_lists_dev_package_names() {
+    let pkgs = vec![
+        InstalledPackage {
+            name: "monolog/monolog".into(),
+            version: "3.8.1".into(),
+            package_type: "library".into(),
+            dist_type: "zip".into(),
+            dist_url: None,
+            reference: "a".into(),
+            shasum: String::new(),
+            dev: false,
+        },
+        InstalledPackage {
+            name: "phpunit/phpunit".into(),
+            version: "11.0.0".into(),
+            package_type: "library".into(),
+            dist_type: "zip".into(),
+            dist_url: None,
+            reference: "b".into(),
+            shasum: String::new(),
+            dev: true,
+        },
+    ];
+    let json = render_installed_json(&pkgs, &std::collections::BTreeMap::new());
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        parsed["dev-package-names"],
+        serde_json::json!(["phpunit/phpunit"])
+    );
 }
 
 #[test]

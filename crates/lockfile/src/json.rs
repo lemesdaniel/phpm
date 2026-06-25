@@ -1,12 +1,15 @@
 use serde::Deserialize;
 use std::collections::BTreeMap;
 
-/// String OR array of strings — normalizes to Vec<String>.
+/// String OR array-of-strings OR anything else — normalizes to Vec<String>.
+/// The "anything else" arm silently discards object-valued script entries like
+/// Symfony Flex's `"auto-scripts": {"cache:clear": "symfony-cmd", ...}`.
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum OneOrMany {
     One(String),
     Many(Vec<String>),
+    Other(#[allow(dead_code)] serde_json::Value),
 }
 
 impl OneOrMany {
@@ -14,6 +17,7 @@ impl OneOrMany {
         match self {
             OneOrMany::One(s) => vec![s],
             OneOrMany::Many(v) => v,
+            OneOrMany::Other(_) => vec![],
         }
     }
 }

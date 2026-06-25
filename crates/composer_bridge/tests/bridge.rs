@@ -25,7 +25,7 @@ fn update_invokes_composer_update_no_install() {
     assert_eq!(calls[0].0, "composer");
     assert_eq!(
         calls[0].1,
-        vec!["update", "--no-install", "--no-interaction"]
+        vec!["update", "--no-install", "--no-scripts", "--no-interaction"]
     );
 }
 
@@ -38,6 +38,7 @@ fn require_passes_packages_and_no_install() {
         vec![
             "require",
             "--no-install",
+            "--no-scripts",
             "--no-interaction",
             "monolog/monolog:^3.0"
         ]
@@ -53,6 +54,7 @@ fn remove_passes_packages_and_no_install() {
         vec![
             "remove",
             "--no-install",
+            "--no-scripts",
             "--no-interaction",
             "monolog/monolog"
         ]

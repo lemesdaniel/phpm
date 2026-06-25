@@ -249,7 +249,7 @@ fn sync_materializes_lock_packages_from_store() {
         linker::sentinel::read_sentinel(&project.path().join("vendor"))
             .unwrap()
             .as_deref(),
-        Some("h1")
+        Some("h1|dev=false")
     );
 }
 
@@ -380,7 +380,7 @@ fn sync_recovers_after_partial_then_completes() {
     assert!(vendor.join("acme/pkg/src/A.php").exists());
     assert_eq!(
         linker::sentinel::read_sentinel(&vendor).unwrap().as_deref(),
-        Some("h1")
+        Some("h1|dev=false")
     );
 }
 
@@ -435,4 +435,42 @@ fn sync_prunes_stale_files_on_version_upgrade() {
         "stale v1 file pruned on upgrade"
     );
     assert!(project.path().join("vendor/acme/pkg/src/New.php").exists());
+}
+
+#[test]
+#[cfg(unix)]
+fn sync_prunes_dev_package_when_dev_cleared_same_hash() {
+    let store_dir = TempDir::new().unwrap();
+    let project = TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+    seed_store(&store, "acme", "app", "1.0.0");
+    seed_store(&store, "phpunit", "phpunit", "11.0.0");
+
+    // full install: prod + dev, content_hash "h"
+    let full = ComposerLock {
+        content_hash: "h".into(),
+        packages: vec![pkg("acme/app", "1.0.0")],
+        packages_dev: vec![pkg("phpunit/phpunit", "11.0.0")],
+        plugin_api_version: String::new(),
+    };
+    sync(project.path(), &full, &store).unwrap();
+    assert!(project.path().join("vendor/phpunit/phpunit").exists());
+
+    // --no-dev install: SAME content_hash, packages_dev cleared
+    let nodev = ComposerLock {
+        content_hash: "h".into(),
+        packages: vec![pkg("acme/app", "1.0.0")],
+        packages_dev: vec![],
+        plugin_api_version: String::new(),
+    };
+    let report = sync(project.path(), &nodev, &store).unwrap();
+    assert!(
+        !report.no_op,
+        "dev-mode switch must NOT be a no-op despite same content_hash"
+    );
+    assert!(
+        !project.path().join("vendor/phpunit/phpunit").exists(),
+        "dev package must be pruned"
+    );
+    assert!(project.path().join("vendor/acme/app").exists());
 }

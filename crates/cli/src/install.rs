@@ -26,6 +26,16 @@ pub enum CliError {
 pub struct InstallOpts {
     /// Base dir for the project registry (typically ~/.phpm).
     pub registry_base: PathBuf,
+    /// When true, packages_dev are excluded from acquire/link/generate.
+    pub no_dev: bool,
+}
+
+/// Result of the install pipeline. Callers may inspect `lock_possibly_stale`
+/// and emit a warning; it is a heuristic — a version-only drift is NOT detected.
+pub struct InstallReport {
+    /// True when composer.json requires at least one real (non-platform) package
+    /// that is absent from composer.lock. Run `phpm update` to re-resolve.
+    pub lock_possibly_stale: bool,
 }
 
 /// The install pipeline: acquire → link → generate → scripts → register.
@@ -37,13 +47,39 @@ pub fn install(
     fetcher: &dyn Fetcher,
     runner: &dyn Runner,
     opts: &InstallOpts,
-) -> Result<(), CliError> {
+) -> Result<InstallReport, CliError> {
     let lock_raw = match std::fs::read_to_string(project_dir.join("composer.lock")) {
         Ok(s) => s,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(CliError::NoLock),
         Err(e) => return Err(CliError::Io(e)),
     };
-    let lock = lockfile::parse_lock(&lock_raw)?;
+    let mut lock = lockfile::parse_lock(&lock_raw)?;
+
+    // Staleness check: computed from the FULL lock (both sections) before any --no-dev clear,
+    // so a dev require is not falsely flagged stale under --no-dev.
+    let locked_names: std::collections::BTreeSet<String> = lock
+        .packages
+        .iter()
+        .chain(lock.packages_dev.iter())
+        .map(|p| p.name.clone())
+        .collect();
+    let lock_possibly_stale = {
+        let root_raw =
+            std::fs::read_to_string(project_dir.join("composer.json")).unwrap_or_default();
+        match lockfile::parse_json(&root_raw) {
+            Ok(cj) => cj
+                .require
+                .keys()
+                .chain(cj.require_dev.keys())
+                .filter(|name| store::PackageCoords::from_name(name, "0").is_some())
+                .any(|name| !locked_names.contains(name)),
+            Err(_) => false,
+        }
+    };
+
+    if opts.no_dev {
+        lock.packages_dev.clear();
+    }
 
     for locked in lock.packages.iter().chain(lock.packages_dev.iter()) {
         acquire::acquire_package(store, fetcher, locked)?;
@@ -69,5 +105,7 @@ pub fn install(
     })?;
     reg.register(project_str)?;
 
-    Ok(())
+    Ok(InstallReport {
+        lock_possibly_stale,
+    })
 }

@@ -59,13 +59,22 @@ fn classes_in_source(src: &str) -> Vec<String> {
 }
 
 fn strip_line_comment(line: &str) -> &str {
-    let cut = line.find("//").or_else(|| line.find('#')).unwrap_or(line.len());
+    let cut = line
+        .find("//")
+        .or_else(|| line.find('#'))
+        .unwrap_or(line.len());
     &line[..cut]
 }
 
 fn parse_namespace(line: &str) -> Option<String> {
     let rest = line.strip_prefix("namespace ")?;
-    Some(rest.trim_end_matches(';').trim().trim_matches('{').trim().to_string())
+    Some(
+        rest.trim_end_matches(';')
+            .trim()
+            .trim_matches('{')
+            .trim()
+            .to_string(),
+    )
 }
 
 fn parse_type_decl(line: &str) -> Option<String> {
@@ -116,5 +125,7 @@ pub fn classmap_for_package(
 
 fn rebase(map: BTreeMap<String, String>, coords: &PackageCoords) -> BTreeMap<String, String> {
     let prefix = format!("$vendorDir/{}/{}", coords.vendor, coords.package);
-    map.into_iter().map(|(class, rel)| (class, format!("{prefix}/{rel}"))).collect()
+    map.into_iter()
+        .map(|(class, rel)| (class, format!("{prefix}/{rel}")))
+        .collect()
 }

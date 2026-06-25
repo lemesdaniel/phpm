@@ -49,7 +49,11 @@ pub fn aggregate_autoload(
 ) {
     let prefixed = |rel: &str| -> String {
         match pkg_prefix {
-            Some(p) => format!("{}/{}", p.trim_end_matches('/'), rel.trim_start_matches('/')),
+            Some(p) => format!(
+                "{}/{}",
+                p.trim_end_matches('/'),
+                rel.trim_start_matches('/')
+            ),
             None => rel.to_string(),
         }
     };

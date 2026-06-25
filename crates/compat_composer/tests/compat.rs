@@ -1,18 +1,25 @@
-use compat_composer::GenError;
 use compat_composer::aggregate::{aggregate_autoload, AutoloadData, PathBase};
-use compat_composer::bin_proxies::{render_bin_proxy_php, render_bin_proxy_bat};
+use compat_composer::bin_proxies::{render_bin_proxy_bat, render_bin_proxy_php};
 use compat_composer::classmap::{classmap_for_package, scan_php_classes};
-use compat_composer::installed::{render_installed_php, render_installed_json, InstalledPackage};
-use compat_composer::php_emit::{render_psr4_php, render_files_php, render_classmap_php, render_autoload_real, render_autoload_entry};
 use compat_composer::generate;
+use compat_composer::installed::{render_installed_json, render_installed_php, InstalledPackage};
+use compat_composer::php_emit::{
+    render_autoload_entry, render_autoload_real, render_classmap_php, render_files_php,
+    render_psr4_php,
+};
+use compat_composer::GenError;
 use lockfile::{Autoload, ComposerJson, ComposerLock, LockedPackage};
-use store::{PackageCoords, Store};
 use std::collections::BTreeMap;
 use std::fs;
 use std::process::Command;
+use store::{PackageCoords, Store};
 
 fn php_available() -> bool {
-    Command::new("php").arg("--version").output().map(|o| o.status.success()).unwrap_or(false)
+    Command::new("php")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 /// Seed the store + materialize a tiny PSR-4 package into vendor (M3 would do this).
@@ -24,7 +31,11 @@ fn setup_greet(store: &Store, project: &std::path::Path) {
     fs::create_dir_all(src.path().join("src")).unwrap();
     fs::write(src.path().join("composer.json"), cj).unwrap();
     fs::write(src.path().join("src/Hello.php"), body).unwrap();
-    let coords = PackageCoords { vendor: "acme".into(), package: "greet".into(), version: "1.0.0".into() };
+    let coords = PackageCoords {
+        vendor: "acme".into(),
+        package: "greet".into(),
+        version: "1.0.0".into(),
+    };
     store.write_package(&coords, src.path()).unwrap();
     // materialize into vendor
     let dest = project.join("vendor/acme/greet");
@@ -37,8 +48,11 @@ fn greet_lock() -> ComposerLock {
     ComposerLock {
         content_hash: "h1".into(),
         packages: vec![LockedPackage {
-            name: "acme/greet".into(), version: "1.0.0".into(),
-            package_type: "library".into(), dist: None, source: None,
+            name: "acme/greet".into(),
+            version: "1.0.0".into(),
+            package_type: "library".into(),
+            dist: None,
+            source: None,
         }],
         packages_dev: vec![],
         plugin_api_version: String::new(),
@@ -52,7 +66,13 @@ fn generate_writes_all_expected_files() {
     let store = Store::new(store_dir.path());
     setup_greet(&store, project.path());
 
-    generate(project.path(), &greet_lock(), &store, r#"{"name":"acme/app"}"#).unwrap();
+    generate(
+        project.path(),
+        &greet_lock(),
+        &store,
+        r#"{"name":"acme/app"}"#,
+    )
+    .unwrap();
 
     let vendor = project.path().join("vendor");
     for f in [
@@ -81,14 +101,24 @@ fn generated_autoloader_loads_a_class() {
     let project = tempfile::TempDir::new().unwrap();
     let store = Store::new(store_dir.path());
     setup_greet(&store, project.path());
-    generate(project.path(), &greet_lock(), &store, r#"{"name":"acme/app"}"#).unwrap();
+    generate(
+        project.path(),
+        &greet_lock(),
+        &store,
+        r#"{"name":"acme/app"}"#,
+    )
+    .unwrap();
 
     let script = format!(
         "require '{}/vendor/autoload.php'; echo \\Acme\\Greet\\Hello::hi();",
         project.path().display()
     );
     let out = Command::new("php").arg("-r").arg(&script).output().unwrap();
-    assert!(out.status.success(), "php failed: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "php failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&out.stdout), "hi");
 }
 
@@ -102,7 +132,13 @@ fn generated_installed_versions_works() {
     let project = tempfile::TempDir::new().unwrap();
     let store = Store::new(store_dir.path());
     setup_greet(&store, project.path());
-    generate(project.path(), &greet_lock(), &store, r#"{"name":"acme/app"}"#).unwrap();
+    generate(
+        project.path(),
+        &greet_lock(),
+        &store,
+        r#"{"name":"acme/app"}"#,
+    )
+    .unwrap();
 
     // load autoload then query InstalledVersions for the dependency
     let script = format!(
@@ -110,7 +146,11 @@ fn generated_installed_versions_works() {
         project.path().display()
     );
     let out = Command::new("php").arg("-r").arg(&script).output().unwrap();
-    assert!(out.status.success(), "php failed: {}", String::from_utf8_lossy(&out.stderr));
+    assert!(
+        out.status.success(),
+        "php failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     assert_eq!(String::from_utf8_lossy(&out.stdout), "1.0.0");
 }
 
@@ -127,7 +167,11 @@ fn generate_writes_executable_bin_proxy() {
     fs::create_dir_all(src.path().join("bin")).unwrap();
     fs::write(src.path().join("composer.json"), cj).unwrap();
     fs::write(src.path().join("bin/acmetool"), b"<?php // tool\n").unwrap();
-    let coords = PackageCoords { vendor: "acme".into(), package: "tool".into(), version: "1.0.0".into() };
+    let coords = PackageCoords {
+        vendor: "acme".into(),
+        package: "tool".into(),
+        version: "1.0.0".into(),
+    };
     store.write_package(&coords, src.path()).unwrap();
     let dest = project.path().join("vendor/acme/tool");
     fs::create_dir_all(dest.join("bin")).unwrap();
@@ -137,10 +181,14 @@ fn generate_writes_executable_bin_proxy() {
     let lock = ComposerLock {
         content_hash: "hb".into(),
         packages: vec![LockedPackage {
-            name: "acme/tool".into(), version: "1.0.0".into(),
-            package_type: "library".into(), dist: None, source: None,
+            name: "acme/tool".into(),
+            version: "1.0.0".into(),
+            package_type: "library".into(),
+            dist: None,
+            source: None,
         }],
-        packages_dev: vec![], plugin_api_version: String::new(),
+        packages_dev: vec![],
+        plugin_api_version: String::new(),
     };
     generate(project.path(), &lock, &store, r#"{"name":"acme/app"}"#).unwrap();
 
@@ -157,19 +205,27 @@ fn gen_error_is_constructible() {
 }
 
 fn psr4(map: &[(&str, &str)]) -> BTreeMap<String, Vec<String>> {
-    map.iter().map(|(k, v)| (k.to_string(), vec![v.to_string()])).collect()
+    map.iter()
+        .map(|(k, v)| (k.to_string(), vec![v.to_string()]))
+        .collect()
 }
 
 #[test]
 fn aggregates_root_and_dependency_psr4_with_correct_base() {
     let root = ComposerJson {
         name: "acme/app".into(),
-        autoload: Autoload { psr4: psr4(&[("App\\", "app/")]), ..Default::default() },
+        autoload: Autoload {
+            psr4: psr4(&[("App\\", "app/")]),
+            ..Default::default()
+        },
         ..Default::default()
     };
     let dep = ComposerJson {
         name: "monolog/monolog".into(),
-        autoload: Autoload { psr4: psr4(&[("Monolog\\", "src/Monolog")]), ..Default::default() },
+        autoload: Autoload {
+            psr4: psr4(&[("Monolog\\", "src/Monolog")]),
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -177,7 +233,10 @@ fn aggregates_root_and_dependency_psr4_with_correct_base() {
     aggregate_autoload(&mut data, &root, PathBase::Base, None);
     aggregate_autoload(&mut data, &dep, PathBase::Vendor, Some("monolog/monolog"));
 
-    assert_eq!(data.psr4.get("App\\").unwrap(), &vec![PathBase::Base.join("app")]);
+    assert_eq!(
+        data.psr4.get("App\\").unwrap(),
+        &vec![PathBase::Base.join("app")]
+    );
     assert_eq!(
         data.psr4.get("Monolog\\").unwrap(),
         &vec![PathBase::Vendor.join("monolog/monolog/src/Monolog")]
@@ -188,12 +247,18 @@ fn aggregates_root_and_dependency_psr4_with_correct_base() {
 fn aggregates_files_with_dependency_prefix() {
     let dep = ComposerJson {
         name: "acme/helpers".into(),
-        autoload: Autoload { files: vec!["src/helpers.php".into()], ..Default::default() },
+        autoload: Autoload {
+            files: vec!["src/helpers.php".into()],
+            ..Default::default()
+        },
         ..Default::default()
     };
     let mut data = AutoloadData::default();
     aggregate_autoload(&mut data, &dep, PathBase::Vendor, Some("acme/helpers"));
-    assert_eq!(data.files, vec![PathBase::Vendor.join("acme/helpers/src/helpers.php")]);
+    assert_eq!(
+        data.files,
+        vec![PathBase::Vendor.join("acme/helpers/src/helpers.php")]
+    );
 }
 
 #[test]
@@ -207,7 +272,10 @@ fn path_base_join_handles_empty_and_slashes() {
 fn psr4_php_is_valid_array_with_base_vars() {
     let mut psr4: BTreeMap<String, Vec<String>> = BTreeMap::new();
     psr4.insert("App\\".into(), vec![PathBase::Base.join("app")]);
-    psr4.insert("Monolog\\".into(), vec![PathBase::Vendor.join("monolog/monolog/src/Monolog")]);
+    psr4.insert(
+        "Monolog\\".into(),
+        vec![PathBase::Vendor.join("monolog/monolog/src/Monolog")],
+    );
 
     let php = render_psr4_php(&psr4);
     assert!(php.starts_with("<?php"));
@@ -228,7 +296,10 @@ fn files_php_keys_by_stable_identifier() {
 #[test]
 fn classmap_php_maps_class_to_path() {
     let mut cm: BTreeMap<String, String> = BTreeMap::new();
-    cm.insert("Acme\\Greet\\Hello".into(), PathBase::Vendor.join("acme/greet/src/Hello.php"));
+    cm.insert(
+        "Acme\\Greet\\Hello".into(),
+        PathBase::Vendor.join("acme/greet/src/Hello.php"),
+    );
     let php = render_classmap_php(&cm);
     assert!(php.contains("'Acme\\\\Greet\\\\Hello' => $vendorDir . '/acme/greet/src/Hello.php',"));
 }
@@ -240,7 +311,8 @@ fn scan_finds_namespaced_classes_interfaces_traits_enums() {
     fs::write(
         dir.path().join("src/Logger.php"),
         b"<?php\nnamespace Acme\\Log;\nclass Logger {}\ninterface Sink {}\n",
-    ).unwrap();
+    )
+    .unwrap();
     fs::write(
         dir.path().join("src/Level.php"),
         b"<?php\nnamespace Acme\\Log;\nenum Level: string { case Info = 'info'; }\ntrait Helper {}\n",
@@ -272,12 +344,15 @@ fn scan_handles_chained_modifiers_and_readonly() {
     let found = scan_php_classes(dir.path()).unwrap();
     let mut names: Vec<&String> = found.keys().collect();
     names.sort();
-    assert_eq!(names, vec![
-        &"Acme\\Alpha".to_string(),
-        &"Acme\\Beta".to_string(),
-        &"Acme\\Delta".to_string(),
-        &"Acme\\Gamma".to_string(),
-    ]);
+    assert_eq!(
+        names,
+        vec![
+            &"Acme\\Alpha".to_string(),
+            &"Acme\\Beta".to_string(),
+            &"Acme\\Delta".to_string(),
+            &"Acme\\Gamma".to_string(),
+        ]
+    );
 }
 
 #[test]
@@ -295,16 +370,30 @@ fn classmap_cache_keeps_full_version_and_round_trips() {
     let pkg_dir = tempfile::TempDir::new().unwrap();
     let store = Store::new(store_dir.path());
     fs::create_dir_all(pkg_dir.path().join("src")).unwrap();
-    fs::write(pkg_dir.path().join("src/Hello.php"), b"<?php\nnamespace Acme;\nclass Hello {}\n").unwrap();
-    let coords = PackageCoords { vendor: "acme".into(), package: "greet".into(), version: "3.8.1".into() };
+    fs::write(
+        pkg_dir.path().join("src/Hello.php"),
+        b"<?php\nnamespace Acme;\nclass Hello {}\n",
+    )
+    .unwrap();
+    let coords = PackageCoords {
+        vendor: "acme".into(),
+        package: "greet".into(),
+        version: "3.8.1".into(),
+    };
 
     let first = classmap_for_package(&store, &coords, pkg_dir.path()).unwrap();
     // value is rebased under $vendorDir/<vendor>/<package>/<rel>
-    assert_eq!(first.get("Acme\\Hello").unwrap(), "$vendorDir/acme/greet/src/Hello.php");
+    assert_eq!(
+        first.get("Acme\\Hello").unwrap(),
+        "$vendorDir/acme/greet/src/Hello.php"
+    );
 
     // cache file exists with the FULL version in its name (footgun guard)
     let meta_parent = store.meta_path(&coords).parent().unwrap().to_path_buf();
-    assert!(meta_parent.join("3.8.1.classmap.json").exists(), "cache keeps full version");
+    assert!(
+        meta_parent.join("3.8.1.classmap.json").exists(),
+        "cache keeps full version"
+    );
 
     // second call returns the same result (from cache)
     let second = classmap_for_package(&store, &coords, pkg_dir.path()).unwrap();
@@ -329,13 +418,16 @@ fn autoload_entry_returns_getloader() {
     let php = render_autoload_entry("phpm00000000000000000000000000000");
     assert!(php.starts_with("<?php"));
     assert!(php.contains("require_once __DIR__ . '/composer/autoload_real.php';"));
-    assert!(php.contains("return ComposerAutoloaderInitphpm00000000000000000000000000000::getLoader();"));
+    assert!(php
+        .contains("return ComposerAutoloaderInitphpm00000000000000000000000000000::getLoader();"));
 }
 
 fn pkg_row(name: &str, ver: &str) -> InstalledPackage {
     InstalledPackage {
-        name: name.into(), version: ver.into(),
-        package_type: "library".into(), reference: "abc123".into(),
+        name: name.into(),
+        version: ver.into(),
+        package_type: "library".into(),
+        reference: "abc123".into(),
     }
 }
 
@@ -365,7 +457,10 @@ fn installed_json_carries_extra_for_discovery() {
     let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(parsed["packages"][0]["name"], "acme/provider");
     assert_eq!(parsed["packages"][0]["version"], "1.0.0");
-    assert_eq!(parsed["packages"][0]["extra"]["laravel"]["providers"][0], "Acme\\ServiceProvider");
+    assert_eq!(
+        parsed["packages"][0]["extra"]["laravel"]["providers"][0],
+        "Acme\\ServiceProvider"
+    );
 }
 
 #[test]
@@ -393,13 +488,18 @@ fn generate_tolerates_missing_package_composer_json() {
     let lock = ComposerLock {
         content_hash: "hbroken".into(),
         packages: vec![LockedPackage {
-            name: "acme/broken".into(), version: "1.0.0".into(),
-            package_type: "library".into(), dist: None, source: None,
+            name: "acme/broken".into(),
+            version: "1.0.0".into(),
+            package_type: "library".into(),
+            dist: None,
+            source: None,
         }],
-        packages_dev: vec![], plugin_api_version: String::new(),
+        packages_dev: vec![],
+        plugin_api_version: String::new(),
     };
     // must NOT error; the package is still recorded in installed
     generate(project.path(), &lock, &store, r#"{"name":"acme/app"}"#).unwrap();
-    let installed = fs::read_to_string(project.path().join("vendor/composer/installed.json")).unwrap();
+    let installed =
+        fs::read_to_string(project.path().join("vendor/composer/installed.json")).unwrap();
     assert!(installed.contains("acme/broken"));
 }

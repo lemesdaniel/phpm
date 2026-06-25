@@ -10,7 +10,7 @@ pub mod php_emit;
 
 use crate::aggregate::{aggregate_autoload, AutoloadData, PathBase};
 use crate::installed::InstalledPackage;
-use lockfile::{ComposerLock};
+use lockfile::ComposerLock;
 use std::collections::BTreeMap;
 use std::path::Path;
 use store::{PackageCoords, Store};
@@ -73,7 +73,9 @@ pub fn generate(
             Ok(raw) => {
                 if let Ok(pj) = lockfile::parse_json(&raw) {
                     aggregate_autoload(&mut data, &pj, PathBase::Vendor, Some(&prefix));
-                    classmap.extend(crate::classmap::classmap_for_package(store, &coords, &pkg_dir)?);
+                    classmap.extend(crate::classmap::classmap_for_package(
+                        store, &coords, &pkg_dir,
+                    )?);
                     // bin proxies declared by the package
                     for bin in &pj.bin {
                         write_bin_proxy(&bin_dir, &prefix, bin)?;
@@ -106,17 +108,42 @@ pub fn generate(
     }
 
     std::fs::write(composer_dir.join("ClassLoader.php"), CLASS_LOADER_PHP)?;
-    std::fs::write(composer_dir.join("InstalledVersions.php"), INSTALLED_VERSIONS_PHP)?;
+    std::fs::write(
+        composer_dir.join("InstalledVersions.php"),
+        INSTALLED_VERSIONS_PHP,
+    )?;
 
     use crate::php_emit::*;
-    std::fs::write(composer_dir.join("autoload_psr4.php"), render_psr4_php(&data.psr4))?;
-    std::fs::write(composer_dir.join("autoload_namespaces.php"), render_psr0_php(&data.psr0))?;
-    std::fs::write(composer_dir.join("autoload_files.php"), render_files_php(&data.files))?;
-    std::fs::write(composer_dir.join("autoload_classmap.php"), render_classmap_php(&classmap))?;
-    std::fs::write(composer_dir.join("autoload_real.php"), render_autoload_real(AUTOLOAD_HASH))?;
-    std::fs::write(vendor.join("autoload.php"), render_autoload_entry(AUTOLOAD_HASH))?;
+    std::fs::write(
+        composer_dir.join("autoload_psr4.php"),
+        render_psr4_php(&data.psr4),
+    )?;
+    std::fs::write(
+        composer_dir.join("autoload_namespaces.php"),
+        render_psr0_php(&data.psr0),
+    )?;
+    std::fs::write(
+        composer_dir.join("autoload_files.php"),
+        render_files_php(&data.files),
+    )?;
+    std::fs::write(
+        composer_dir.join("autoload_classmap.php"),
+        render_classmap_php(&classmap),
+    )?;
+    std::fs::write(
+        composer_dir.join("autoload_real.php"),
+        render_autoload_real(AUTOLOAD_HASH),
+    )?;
+    std::fs::write(
+        vendor.join("autoload.php"),
+        render_autoload_entry(AUTOLOAD_HASH),
+    )?;
 
-    let root_name = if root.name.is_empty() { "__root__".to_string() } else { root.name.clone() };
+    let root_name = if root.name.is_empty() {
+        "__root__".to_string()
+    } else {
+        root.name.clone()
+    };
     std::fs::write(
         composer_dir.join("installed.php"),
         crate::installed::render_installed_php(&root_name, "1.0.0+no-version-set", &installed),
@@ -133,11 +160,20 @@ pub fn generate(
 /// pointing at the real binary at `vendor/<prefix>/<bin>`. The proxy gets the +x bit on unix.
 fn write_bin_proxy(bin_dir: &Path, pkg_prefix: &str, bin_rel: &str) -> Result<(), GenError> {
     std::fs::create_dir_all(bin_dir)?;
-    let tool = Path::new(bin_rel).file_name().and_then(|n| n.to_str()).unwrap_or(bin_rel);
+    let tool = Path::new(bin_rel)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(bin_rel);
     let rel_from_vendor = format!("{}/{}", pkg_prefix, bin_rel.trim_start_matches('/'));
     let proxy_path = bin_dir.join(tool);
-    std::fs::write(&proxy_path, crate::bin_proxies::render_bin_proxy_php(&rel_from_vendor))?;
-    std::fs::write(bin_dir.join(format!("{tool}.bat")), crate::bin_proxies::render_bin_proxy_bat(tool))?;
+    std::fs::write(
+        &proxy_path,
+        crate::bin_proxies::render_bin_proxy_php(&rel_from_vendor),
+    )?;
+    std::fs::write(
+        bin_dir.join(format!("{tool}.bat")),
+        crate::bin_proxies::render_bin_proxy_bat(tool),
+    )?;
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;

@@ -39,7 +39,11 @@ pub fn render_psr0_php(psr0: &BTreeMap<String, Vec<String>>) -> String {
 fn render_namespace_map(map: &BTreeMap<String, Vec<String>>) -> String {
     let mut out = preamble();
     for (ns, dirs) in map {
-        let arr = dirs.iter().map(|d| path_expr(d)).collect::<Vec<_>>().join(", ");
+        let arr = dirs
+            .iter()
+            .map(|d| path_expr(d))
+            .collect::<Vec<_>>()
+            .join(", ");
         out.push_str(&format!("    '{}' => array({arr}),\n", php_escape(ns)));
     }
     out.push_str(");\n");
@@ -51,7 +55,11 @@ fn render_namespace_map(map: &BTreeMap<String, Vec<String>>) -> String {
 pub fn render_files_php(files: &[String]) -> String {
     let mut out = preamble();
     for f in files {
-        out.push_str(&format!("    '{}' => {},\n", file_identifier(f), path_expr(f)));
+        out.push_str(&format!(
+            "    '{}' => {},\n",
+            file_identifier(f),
+            path_expr(f)
+        ));
     }
     out.push_str(");\n");
     out
@@ -61,7 +69,11 @@ pub fn render_files_php(files: &[String]) -> String {
 pub fn render_classmap_php(classmap: &BTreeMap<String, String>) -> String {
     let mut out = preamble();
     for (class, path) in classmap {
-        out.push_str(&format!("    '{}' => {},\n", php_escape(class), path_expr(path)));
+        out.push_str(&format!(
+            "    '{}' => {},\n",
+            php_escape(class),
+            path_expr(path)
+        ));
     }
     out.push_str(");\n");
     out

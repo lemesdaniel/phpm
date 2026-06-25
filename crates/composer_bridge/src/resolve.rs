@@ -17,7 +17,12 @@ pub fn require(
     project_dir: &Path,
     packages: &[String],
 ) -> Result<(), BridgeError> {
-    let mut args = vec!["require", "--no-install", "--no-scripts", "--no-interaction"];
+    let mut args = vec![
+        "require",
+        "--no-install",
+        "--no-scripts",
+        "--no-interaction",
+    ];
     args.extend(packages.iter().map(|s| s.as_str()));
     runner.run("composer", &args, project_dir)
 }

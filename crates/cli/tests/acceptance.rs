@@ -1,7 +1,7 @@
 use cli::install::{install, InstallOpts};
 use composer_bridge::SystemRunner;
-use store::Store;
 use std::process::Command;
+use store::Store;
 
 fn have(bin: &str) -> bool {
     Command::new(bin)

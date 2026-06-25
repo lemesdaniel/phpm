@@ -438,8 +438,26 @@ fn pkg_row(name: &str, ver: &str) -> InstalledPackage {
 #[test]
 fn installed_php_dev_requirement_reflects_dev_flag() {
     let pkgs = vec![
-        InstalledPackage { name: "monolog/monolog".into(), version: "3.8.1".into(), package_type: "library".into(), dist_type: "zip".into(), dist_url: None, reference: "a".into(), shasum: String::new(), dev: false },
-        InstalledPackage { name: "phpunit/phpunit".into(), version: "11.0.0".into(), package_type: "library".into(), dist_type: "zip".into(), dist_url: None, reference: "b".into(), shasum: String::new(), dev: true },
+        InstalledPackage {
+            name: "monolog/monolog".into(),
+            version: "3.8.1".into(),
+            package_type: "library".into(),
+            dist_type: "zip".into(),
+            dist_url: None,
+            reference: "a".into(),
+            shasum: String::new(),
+            dev: false,
+        },
+        InstalledPackage {
+            name: "phpunit/phpunit".into(),
+            version: "11.0.0".into(),
+            package_type: "library".into(),
+            dist_type: "zip".into(),
+            dist_url: None,
+            reference: "b".into(),
+            shasum: String::new(),
+            dev: true,
+        },
     ];
     let php = render_installed_php("acme/app", "1.0.0", &pkgs);
     assert!(php.contains("'dev_requirement' => false,"));
@@ -449,12 +467,33 @@ fn installed_php_dev_requirement_reflects_dev_flag() {
 #[test]
 fn installed_json_lists_dev_package_names() {
     let pkgs = vec![
-        InstalledPackage { name: "monolog/monolog".into(), version: "3.8.1".into(), package_type: "library".into(), dist_type: "zip".into(), dist_url: None, reference: "a".into(), shasum: String::new(), dev: false },
-        InstalledPackage { name: "phpunit/phpunit".into(), version: "11.0.0".into(), package_type: "library".into(), dist_type: "zip".into(), dist_url: None, reference: "b".into(), shasum: String::new(), dev: true },
+        InstalledPackage {
+            name: "monolog/monolog".into(),
+            version: "3.8.1".into(),
+            package_type: "library".into(),
+            dist_type: "zip".into(),
+            dist_url: None,
+            reference: "a".into(),
+            shasum: String::new(),
+            dev: false,
+        },
+        InstalledPackage {
+            name: "phpunit/phpunit".into(),
+            version: "11.0.0".into(),
+            package_type: "library".into(),
+            dist_type: "zip".into(),
+            dist_url: None,
+            reference: "b".into(),
+            shasum: String::new(),
+            dev: true,
+        },
     ];
     let json = render_installed_json(&pkgs, &std::collections::BTreeMap::new());
     let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
-    assert_eq!(parsed["dev-package-names"], serde_json::json!(["phpunit/phpunit"]));
+    assert_eq!(
+        parsed["dev-package-names"],
+        serde_json::json!(["phpunit/phpunit"])
+    );
 }
 
 #[test]

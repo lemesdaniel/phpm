@@ -105,5 +105,7 @@ pub fn install(
     })?;
     reg.register(project_str)?;
 
-    Ok(InstallReport { lock_possibly_stale })
+    Ok(InstallReport {
+        lock_possibly_stale,
+    })
 }

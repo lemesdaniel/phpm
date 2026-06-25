@@ -209,15 +209,24 @@ fn install_warns_when_composer_json_has_unlocked_require() {
     let registry_home = tempfile::TempDir::new().unwrap();
     let store = Store::new(store_dir.path());
     seed_pkg(&store, project.path(), "acme", "greet", "1.0.0");
-    fs::write(project.path().join("composer.json"),
-        br#"{"name":"acme/app","require":{"acme/greet":"^1.0","acme/missing":"^2.0"}}"#).unwrap();
+    fs::write(
+        project.path().join("composer.json"),
+        br#"{"name":"acme/app","require":{"acme/greet":"^1.0","acme/missing":"^2.0"}}"#,
+    )
+    .unwrap();
     fs::write(project.path().join("composer.lock"),
         br#"{"content-hash":"h","packages":[{"name":"acme/greet","version":"1.0.0"}],"packages-dev":[]}"#).unwrap();
 
     let runner = RecordingRunner::default();
-    let opts = InstallOpts { registry_base: registry_home.path().to_path_buf(), no_dev: false };
+    let opts = InstallOpts {
+        registry_base: registry_home.path().to_path_buf(),
+        no_dev: false,
+    };
     let report = install(project.path(), &store, &NoFetch, &runner, &opts).unwrap();
-    assert!(report.lock_possibly_stale, "require not in lock should flag staleness");
+    assert!(
+        report.lock_possibly_stale,
+        "require not in lock should flag staleness"
+    );
 }
 
 #[test]
@@ -227,13 +236,19 @@ fn install_not_stale_when_all_requires_locked() {
     let registry_home = tempfile::TempDir::new().unwrap();
     let store = Store::new(store_dir.path());
     seed_pkg(&store, project.path(), "acme", "greet", "1.0.0");
-    fs::write(project.path().join("composer.json"),
-        br#"{"name":"acme/app","require":{"acme/greet":"^1.0","php":"^8.2"}}"#).unwrap();
+    fs::write(
+        project.path().join("composer.json"),
+        br#"{"name":"acme/app","require":{"acme/greet":"^1.0","php":"^8.2"}}"#,
+    )
+    .unwrap();
     fs::write(project.path().join("composer.lock"),
         br#"{"content-hash":"h","packages":[{"name":"acme/greet","version":"1.0.0"}],"packages-dev":[]}"#).unwrap();
 
     let runner = RecordingRunner::default();
-    let opts = InstallOpts { registry_base: registry_home.path().to_path_buf(), no_dev: false };
+    let opts = InstallOpts {
+        registry_base: registry_home.path().to_path_buf(),
+        no_dev: false,
+    };
     let report = install(project.path(), &store, &NoFetch, &runner, &opts).unwrap();
     // "php" is a platform require (no slash) → ignored; acme/greet IS locked → not stale
     assert!(!report.lock_possibly_stale);
@@ -246,18 +261,29 @@ fn install_no_dev_skips_dev_packages() {
     let registry_home = tempfile::TempDir::new().unwrap();
     let store = Store::new(store_dir.path());
 
-    seed_pkg(&store, project.path(), "acme", "greet", "1.0.0");       // prod
+    seed_pkg(&store, project.path(), "acme", "greet", "1.0.0"); // prod
     seed_pkg(&store, project.path(), "phpunit", "phpunit", "11.0.0"); // dev
-    fs::write(project.path().join("composer.json"), br#"{"name":"acme/app"}"#).unwrap();
+    fs::write(
+        project.path().join("composer.json"),
+        br#"{"name":"acme/app"}"#,
+    )
+    .unwrap();
     fs::write(project.path().join("composer.lock"),
         br#"{"content-hash":"h","packages":[{"name":"acme/greet","version":"1.0.0"}],"packages-dev":[{"name":"phpunit/phpunit","version":"11.0.0"}]}"#).unwrap();
 
     let runner = RecordingRunner::default();
-    let opts = InstallOpts { registry_base: registry_home.path().to_path_buf(), no_dev: true };
+    let opts = InstallOpts {
+        registry_base: registry_home.path().to_path_buf(),
+        no_dev: true,
+    };
     install(project.path(), &store, &NoFetch, &runner, &opts).unwrap();
 
     assert!(project.path().join("vendor/acme/greet/src/X.php").exists());
-    assert!(!project.path().join("vendor/phpunit/phpunit").exists(), "dev package must be absent with --no-dev");
-    let installed = fs::read_to_string(project.path().join("vendor/composer/installed.json")).unwrap();
+    assert!(
+        !project.path().join("vendor/phpunit/phpunit").exists(),
+        "dev package must be absent with --no-dev"
+    );
+    let installed =
+        fs::read_to_string(project.path().join("vendor/composer/installed.json")).unwrap();
     assert!(!installed.contains("phpunit/phpunit"));
 }

@@ -1,7 +1,7 @@
 use compat_composer::GenError;
 use compat_composer::aggregate::{aggregate_autoload, AutoloadData, PathBase};
 use compat_composer::classmap::{classmap_for_package, scan_php_classes};
-use compat_composer::php_emit::{render_psr4_php, render_files_php, render_classmap_php};
+use compat_composer::php_emit::{render_psr4_php, render_files_php, render_classmap_php, render_autoload_real, render_autoload_entry};
 use lockfile::{Autoload, ComposerJson};
 use std::collections::BTreeMap;
 use std::fs;
@@ -165,4 +165,25 @@ fn classmap_cache_keeps_full_version_and_round_trips() {
     // second call returns the same result (from cache)
     let second = classmap_for_package(&store, &coords, pkg_dir.path()).unwrap();
     assert_eq!(first, second);
+}
+
+#[test]
+fn autoload_real_wires_loader_with_hash() {
+    let php = render_autoload_real("phpm00000000000000000000000000000");
+    assert!(php.contains("class ComposerAutoloaderInitphpm00000000000000000000000000000"));
+    assert!(php.contains("require __DIR__ . '/ClassLoader.php';"));
+    assert!(php.contains("$loader->setPsr4("));
+    assert!(php.contains("$loader->set("));
+    assert!(php.contains("$loader->addClassMap("));
+    assert!(php.contains("$loader->register(true);"));
+    // M4 uses the dynamic form, not the static optimization
+    assert!(!php.contains("autoload_static.php"));
+}
+
+#[test]
+fn autoload_entry_returns_getloader() {
+    let php = render_autoload_entry("phpm00000000000000000000000000000");
+    assert!(php.starts_with("<?php"));
+    assert!(php.contains("require_once __DIR__ . '/composer/autoload_real.php';"));
+    assert!(php.contains("return ComposerAutoloaderInitphpm00000000000000000000000000000::getLoader();"));
 }

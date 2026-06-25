@@ -96,6 +96,47 @@ fn write_package_leaves_no_temp_on_success() {
     }
 }
 
+#[test]
+// flock on Linux is per (process, inode): a try_lock_exclusive in the same process
+// that holds a shared lock does not conflict. This in-process test is only valid on
+// macOS/BSD (per open-file-description). Real cross-process coverage (subprocess)
+// is deferred to the M3/M5 harness. See backlog.
+#[cfg(not(target_os = "linux"))]
+fn try_lock_exclusive_none_when_shared_held() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    let _shared = store.lock_shared(&coords()).unwrap();
+    assert!(store.try_lock_exclusive(&coords()).unwrap().is_none());
+}
+
+#[test]
+fn try_lock_exclusive_some_when_free() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    assert!(store.try_lock_exclusive(&coords()).unwrap().is_some());
+}
+
+#[test]
+fn list_packages_enumerates_stored_coords() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    store.write_package(&coords(), fake_source().path()).unwrap();
+    let other = PackageCoords { vendor: "psr".into(), package: "log".into(), version: "3.0.0".into() };
+    store.write_package(&other, fake_source().path()).unwrap();
+
+    let got = store.list_packages().unwrap();
+    assert_eq!(got.len(), 2);
+    assert!(got.iter().any(|c| c.vendor == "monolog" && c.package == "monolog" && c.version == "3.8.1"));
+    assert!(got.iter().any(|c| c.vendor == "psr" && c.package == "log" && c.version == "3.0.0"));
+}
+
+#[test]
+fn list_packages_empty_when_no_store() {
+    let tmp = TempDir::new().unwrap();
+    let store = Store::new(tmp.path());
+    assert!(store.list_packages().unwrap().is_empty());
+}
+
 fn coords() -> PackageCoords {
     PackageCoords {
         vendor: "monolog".into(),

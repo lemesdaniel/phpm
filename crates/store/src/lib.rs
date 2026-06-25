@@ -93,4 +93,36 @@ impl Store {
     pub fn root_for_volume_check(&self) -> &std::path::Path {
         self.root_ref()
     }
+
+    /// Enumerate every `(vendor, package, version)` materialized under `packages/`.
+    /// A missing store returns an empty list.
+    pub fn list_packages(&self) -> Result<Vec<PackageCoords>, StoreError> {
+        let root = self.root_ref().join("packages");
+        let mut out = Vec::new();
+        let vendors = match std::fs::read_dir(&root) {
+            Ok(rd) => rd,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(out),
+            Err(e) => return Err(StoreError::Io(e)),
+        };
+        for v in vendors {
+            let v = v?;
+            if !v.file_type()?.is_dir() { continue; }
+            let vendor = v.file_name().to_string_lossy().into_owned();
+            for p in std::fs::read_dir(v.path())? {
+                let p = p?;
+                if !p.file_type()?.is_dir() { continue; }
+                let package = p.file_name().to_string_lossy().into_owned();
+                for ver in std::fs::read_dir(p.path())? {
+                    let ver = ver?;
+                    if !ver.file_type()?.is_dir() { continue; }
+                    out.push(PackageCoords {
+                        vendor: vendor.clone(),
+                        package: package.clone(),
+                        version: ver.file_name().to_string_lossy().into_owned(),
+                    });
+                }
+            }
+        }
+        Ok(out)
+    }
 }

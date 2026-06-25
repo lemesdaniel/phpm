@@ -83,12 +83,7 @@ fn run_script_runs_declared_event() {
     assert_eq!(calls[0].0, "composer");
     assert_eq!(
         calls[0].1,
-        vec![
-            "run-script",
-            "--no-interaction",
-            "--no-plugins",
-            "post-autoload-dump"
-        ]
+        vec!["run-script", "--no-interaction", "post-autoload-dump"]
     );
 }
 

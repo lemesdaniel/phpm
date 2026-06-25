@@ -17,11 +17,14 @@ pub fn run_script(runner: &dyn Runner, project_dir: &Path, event: &str) -> Resul
     if !declared {
         return Ok(());
     }
-    // --no-plugins: phpm does not support Composer plugins (v1 non-goal). Without it, the
-    // PluginManager bootstrap during run-script can reject a project's plugin and abort.
+    // Plugins ARE allowed here: event plugins (e.g. a phpcs standards installer) hook script
+    // events like post-autoload-dump and must run. Composer only activates plugins the project
+    // lists in config.allow-plugins, and installed.json now carries each package's full require
+    // block so the PluginManager can validate them. Installer plugins that relocate install
+    // paths are still not honored because phpm, not Composer, materializes vendor/.
     runner.run(
         "composer",
-        &["run-script", "--no-interaction", "--no-plugins", event],
+        &["run-script", "--no-interaction", event],
         project_dir,
     )
 }

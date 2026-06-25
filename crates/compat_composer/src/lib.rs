@@ -35,6 +35,8 @@ pub(crate) const INSTALLED_VERSIONS_PHP: &str = include_str!("../assets/Installe
 
 /// Fixed 32-hex autoload hash. Composer randomizes this per project; functional behavior
 /// depends only on it being consistent across the generated files, so a constant is fine.
+// NOTE: a constant hash means two phpm-generated projects cannot be loaded in the same PHP
+// process (class-name collision). No monorepo support yet; revisit if needed.
 const AUTOLOAD_HASH: &str = "phpm00000000000000000000000000000";
 
 /// Generate the Composer-compatible autoload, installed-state, and bin files into vendor/.
@@ -67,19 +69,26 @@ pub fn generate(
         let pkg_dir = vendor.join(&coords.vendor).join(&coords.package);
         let prefix = format!("{}/{}", coords.vendor, coords.package);
 
-        if let Ok(raw) = std::fs::read_to_string(pkg_dir.join("composer.json")) {
-            if let Ok(pj) = lockfile::parse_json(&raw) {
-                aggregate_autoload(&mut data, &pj, PathBase::Vendor, Some(&prefix));
-                classmap.extend(crate::classmap::classmap_for_package(store, &coords, &pkg_dir)?);
-                // bin proxies declared by the package
-                for bin in &pj.bin {
-                    write_bin_proxy(&bin_dir, &prefix, bin)?;
+        match std::fs::read_to_string(pkg_dir.join("composer.json")) {
+            Ok(raw) => {
+                if let Ok(pj) = lockfile::parse_json(&raw) {
+                    aggregate_autoload(&mut data, &pj, PathBase::Vendor, Some(&prefix));
+                    classmap.extend(crate::classmap::classmap_for_package(store, &coords, &pkg_dir)?);
+                    // bin proxies declared by the package
+                    for bin in &pj.bin {
+                        write_bin_proxy(&bin_dir, &prefix, bin)?;
+                    }
+                } else {
+                    eprintln!("phpm: warning: {}/{} has an unparseable composer.json; its autoload was skipped", coords.vendor, coords.package);
+                }
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
+                    if let Some(extra) = v.get("extra") {
+                        extras.insert(locked.name.clone(), extra.clone());
+                    }
                 }
             }
-            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
-                if let Some(extra) = v.get("extra") {
-                    extras.insert(locked.name.clone(), extra.clone());
-                }
+            Err(_) => {
+                eprintln!("phpm: warning: {}/{} has no readable composer.json in vendor; its autoload was skipped", coords.vendor, coords.package);
             }
         }
 

@@ -382,3 +382,24 @@ fn bin_proxy_bat_calls_php() {
     assert!(bat.contains("@php "));
     assert!(bat.to_uppercase().contains("PHPUNIT"));
 }
+
+#[test]
+fn generate_tolerates_missing_package_composer_json() {
+    let store_dir = tempfile::TempDir::new().unwrap();
+    let project = tempfile::TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+    // vendor dir exists but has NO composer.json
+    fs::create_dir_all(project.path().join("vendor/acme/broken/src")).unwrap();
+    let lock = ComposerLock {
+        content_hash: "hbroken".into(),
+        packages: vec![LockedPackage {
+            name: "acme/broken".into(), version: "1.0.0".into(),
+            package_type: "library".into(), dist: None, source: None,
+        }],
+        packages_dev: vec![], plugin_api_version: String::new(),
+    };
+    // must NOT error; the package is still recorded in installed
+    generate(project.path(), &lock, &store, r#"{"name":"acme/app"}"#).unwrap();
+    let installed = fs::read_to_string(project.path().join("vendor/composer/installed.json")).unwrap();
+    assert!(installed.contains("acme/broken"));
+}

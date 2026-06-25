@@ -33,6 +33,9 @@ pub struct AutoloadData {
     pub psr4: BTreeMap<String, Vec<String>>,
     pub psr0: BTreeMap<String, Vec<String>>,
     pub files: Vec<String>,
+    /// Declared classmap dirs from composer.json. NOTE: generate() currently builds the
+    /// classmap by full-walking each package (classmap.rs), so this is collected but not yet
+    /// consulted — a future precise pass could honor only the declared dirs. TODO.
     pub classmap_dirs: Vec<String>,
 }
 

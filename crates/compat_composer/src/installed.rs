@@ -50,6 +50,8 @@ fn render_version_row(name: &str, version: &str, ptype: &str, reference: Option<
     s.push_str(&format!("            'type' => '{}',\n", esc(ptype)));
     s.push_str(&format!("            'install_path' => {},\n", install_expr));
     s.push_str("            'aliases' => array(),\n");
+    // TODO(M5): dev_requirement is hardcoded false; populate from packages_dev membership when
+    // M5 splits dev/prod (also fills installed.json dev-package-names).
     s.push_str("            'dev_requirement' => false,\n");
     s.push_str("        ),\n");
     s

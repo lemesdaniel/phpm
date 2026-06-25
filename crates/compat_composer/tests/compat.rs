@@ -547,6 +547,78 @@ fn installed_json_carries_extra_for_discovery() {
 }
 
 #[test]
+fn installed_json_preserves_require_and_autoload_for_plugin_validation() {
+    use compat_composer::installed::{render_installed_json_full, InstalledEntry};
+    let raw = r#"{"name":"acme/plugin","type":"composer-plugin","require":{"composer-plugin-api":"^2.0"},"autoload":{"psr-4":{"Acme\\Plugin\\":"src/"}},"extra":{"class":"Acme\\Plugin\\Installer"}}"#;
+    let entries = vec![InstalledEntry {
+        name: "acme/plugin".into(),
+        version: "1.2.3".into(),
+        reference: "abc".into(),
+        dist_type: "zip".into(),
+        dist_url: Some("https://x/y.zip".into()),
+        shasum: String::new(),
+        dev: false,
+        composer_json: serde_json::from_str(raw).unwrap(),
+    }];
+    let json = render_installed_json_full(&entries);
+    let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    let p = &v["packages"][0];
+    assert_eq!(p["name"], "acme/plugin");
+    assert_eq!(p["type"], "composer-plugin");
+    assert_eq!(p["require"]["composer-plugin-api"], "^2.0");
+    assert_eq!(p["autoload"]["psr-4"]["Acme\\Plugin\\"], "src/");
+    assert_eq!(p["version"], "1.2.3");
+    assert_eq!(p["version_normalized"], "1.2.3.0");
+    assert_eq!(p["dist"]["type"], "zip");
+    assert_eq!(p["dist"]["reference"], "abc");
+    assert_eq!(p["install-path"], "../acme/plugin");
+}
+
+#[test]
+fn installed_json_full_defaults_type_to_library_when_absent() {
+    use compat_composer::installed::{render_installed_json_full, InstalledEntry};
+    let raw = r#"{"name":"acme/lib","require":{"php":"^8.1"}}"#;
+    let entries = vec![InstalledEntry {
+        name: "acme/lib".into(),
+        version: "2.0.0".into(),
+        reference: "ref".into(),
+        dist_type: "zip".into(),
+        dist_url: None,
+        shasum: String::new(),
+        dev: false,
+        composer_json: serde_json::from_str(raw).unwrap(),
+    }];
+    let json = render_installed_json_full(&entries);
+    let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(v["packages"][0]["type"], "library");
+}
+
+#[test]
+fn installed_json_full_handles_null_composer_json() {
+    use compat_composer::installed::{render_installed_json_full, InstalledEntry};
+    let entries = vec![InstalledEntry {
+        name: "acme/broken".into(),
+        version: "1.0.0".into(),
+        reference: "ref".into(),
+        dist_type: "zip".into(),
+        dist_url: None,
+        shasum: String::new(),
+        dev: false,
+        composer_json: serde_json::Value::Null,
+    }];
+    let json = render_installed_json_full(&entries);
+    let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+    let p = &v["packages"][0];
+    assert!(p.is_object());
+    assert_eq!(p["name"], "acme/broken");
+    assert_eq!(p["version"], "1.0.0");
+    assert_eq!(p["version_normalized"], "1.0.0.0");
+    assert_eq!(p["type"], "library");
+    assert_eq!(p["dist"]["type"], "zip");
+    assert_eq!(p["install-path"], "../acme/broken");
+}
+
+#[test]
 fn bin_proxy_php_resolves_autoload_and_includes_real_binary() {
     let php = render_bin_proxy_php("phpunit/phpunit/phpunit");
     assert!(php.starts_with("#!/usr/bin/env php\n<?php"));

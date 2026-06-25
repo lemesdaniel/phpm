@@ -1,4 +1,5 @@
 use cli::install::{install, InstallOpts};
+use cli::gc_run;
 use composer_bridge::{BridgeError, Runner};
 use acquire::{AcquireError, Fetcher};
 use store::{PackageCoords, Store};
@@ -56,4 +57,45 @@ fn install_end_to_end_offline() {
     assert!(runner.calls.borrow().iter().any(|a| a.contains(&"run-script".to_string()) && a.contains(&"post-autoload-dump".to_string())));
     let reg = gc::registry::Registry::new(registry_home.path());
     assert_eq!(reg.list().unwrap(), vec![project.path().to_str().unwrap().to_string()]);
+}
+
+#[test]
+fn gc_run_dry_run_then_prune() {
+    let store_dir = tempfile::TempDir::new().unwrap();
+    let registry_home = tempfile::TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+
+    // a project IS registered (so gc doesn't refuse with EmptyRegistry), but its lock
+    // references nothing → the seeded package is unreferenced and removable
+    let proj = tempfile::TempDir::new().unwrap();
+    fs::write(proj.path().join("composer.lock"), br#"{"content-hash":"h","packages":[],"packages-dev":[]}"#).unwrap();
+    gc::registry::Registry::new(registry_home.path()).register(proj.path().to_str().unwrap()).unwrap();
+
+    let src = tempfile::TempDir::new().unwrap();
+    fs::create_dir_all(src.path().join("src")).unwrap();
+    fs::write(src.path().join("composer.json"), b"{}").unwrap();
+    fs::write(src.path().join("src/x.php"), b"<?php").unwrap();
+    store.write_package(&PackageCoords { vendor: "old".into(), package: "lib".into(), version: "1.0.0".into() }, src.path()).unwrap();
+
+    // dry run: reports, does NOT delete
+    let report = gc_run(&store, registry_home.path(), false).unwrap();
+    assert_eq!(report.would_remove, 1);
+    assert_eq!(report.removed, 0);
+    assert!(store.has(&PackageCoords { vendor: "old".into(), package: "lib".into(), version: "1.0.0".into() }));
+
+    // prune: deletes
+    let report = gc_run(&store, registry_home.path(), true).unwrap();
+    assert_eq!(report.removed, 1);
+    assert!(!store.has(&PackageCoords { vendor: "old".into(), package: "lib".into(), version: "1.0.0".into() }));
+}
+
+#[test]
+fn gc_run_empty_registry_is_noop_not_error() {
+    let store_dir = tempfile::TempDir::new().unwrap();
+    let registry_home = tempfile::TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+    // nothing registered → gc_run must NOT error; reports 0
+    let report = gc_run(&store, registry_home.path(), true).unwrap();
+    assert_eq!(report.would_remove, 0);
+    assert_eq!(report.removed, 0);
 }

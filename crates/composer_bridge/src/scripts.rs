@@ -1,7 +1,21 @@
 use crate::{BridgeError, Runner};
 use std::path::Path;
 
-/// Placeholder — implemented in Task 3.
-pub fn run_script(_runner: &dyn Runner, _project_dir: &Path, _event: &str) -> Result<(), BridgeError> {
-    unimplemented!()
+/// Run a Composer script event via `composer run-script`, but ONLY if the project's
+/// composer.json declares that event. Running an undeclared event would make Composer
+/// error ("script not defined"); skipping is the correct no-op. This is how Laravel's
+/// package:discover (post-autoload-dump) is triggered after generate().
+pub fn run_script(runner: &dyn Runner, project_dir: &Path, event: &str) -> Result<(), BridgeError> {
+    let raw = match std::fs::read_to_string(project_dir.join("composer.json")) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(e) => return Err(BridgeError::Io(e)),
+    };
+    let declared = lockfile::parse_json(&raw)
+        .map(|cj| cj.scripts.contains_key(event))
+        .unwrap_or(false);
+    if !declared {
+        return Ok(());
+    }
+    runner.run("composer", &["run-script", "--no-interaction", event], project_dir)
 }

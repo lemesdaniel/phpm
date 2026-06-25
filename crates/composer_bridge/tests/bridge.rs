@@ -1,4 +1,5 @@
-use composer_bridge::{update, require, remove, BridgeError, Runner};
+use composer_bridge::{update, require, remove, run_script, BridgeError, Runner};
+use std::fs;
 use std::cell::RefCell;
 use std::path::Path;
 
@@ -34,4 +35,33 @@ fn remove_passes_packages_and_no_install() {
     let r = RecordingRunner::default();
     remove(&r, Path::new("/tmp/proj"), &["monolog/monolog".into()]).unwrap();
     assert_eq!(r.calls.borrow()[0].1, vec!["remove", "--no-install", "--no-interaction", "monolog/monolog"]);
+}
+
+#[test]
+fn run_script_runs_declared_event() {
+    let proj = tempfile::TempDir::new().unwrap();
+    fs::write(proj.path().join("composer.json"),
+        br#"{"scripts":{"post-autoload-dump":["@php artisan package:discover"]}}"#).unwrap();
+    let r = RecordingRunner::default();
+    run_script(&r, proj.path(), "post-autoload-dump").unwrap();
+    let calls = r.calls.borrow();
+    assert_eq!(calls[0].0, "composer");
+    assert_eq!(calls[0].1, vec!["run-script", "--no-interaction", "post-autoload-dump"]);
+}
+
+#[test]
+fn run_script_skips_undeclared_event() {
+    let proj = tempfile::TempDir::new().unwrap();
+    fs::write(proj.path().join("composer.json"), br#"{"scripts":{}}"#).unwrap();
+    let r = RecordingRunner::default();
+    run_script(&r, proj.path(), "post-autoload-dump").unwrap();
+    assert!(r.calls.borrow().is_empty(), "no composer call when event not declared");
+}
+
+#[test]
+fn run_script_skips_when_no_composer_json() {
+    let proj = tempfile::TempDir::new().unwrap();
+    let r = RecordingRunner::default();
+    run_script(&r, proj.path(), "post-autoload-dump").unwrap();
+    assert!(r.calls.borrow().is_empty());
 }

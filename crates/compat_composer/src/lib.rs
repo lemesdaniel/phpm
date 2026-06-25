@@ -33,9 +33,10 @@ pub(crate) const CLASS_LOADER_PHP: &str = include_str!("../assets/ClassLoader.ph
 /// Composer's InstalledVersions runtime, bundled verbatim (MIT).
 pub(crate) const INSTALLED_VERSIONS_PHP: &str = include_str!("../assets/InstalledVersions.php");
 
-/// Fixed 32-hex autoload hash. Composer randomizes this per project; functional behavior
-/// depends only on it being consistent across the generated files, so a constant is fine.
-// NOTE: a constant hash means two phpm-generated projects cannot be loaded in the same PHP
+/// Fixed 33-char alphanumeric autoload tag (not a real hash). Composer randomizes a
+/// per-project hash; functional behavior depends only on this being consistent across the
+/// generated files, so a constant is fine.
+// NOTE: a constant tag means two phpm-generated projects cannot be loaded in the same PHP
 // process (class-name collision). No monorepo support yet; revisit if needed.
 const AUTOLOAD_HASH: &str = "phpm00000000000000000000000000000";
 
@@ -55,6 +56,9 @@ pub fn generate(
     let root = lockfile::parse_json(root_json)?;
 
     let mut data = AutoloadData::default();
+    // TODO(M5): only root.autoload is aggregated, not root.autoload_dev. phpm currently installs
+    // dev packages too (packages_dev), so a dev-install mode should also aggregate root
+    // autoload-dev for test-runner namespaces.
     aggregate_autoload(&mut data, &root, PathBase::Base, None);
 
     let mut classmap: BTreeMap<String, String> = BTreeMap::new();

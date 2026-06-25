@@ -51,13 +51,23 @@ pub fn install(
 
     linker::sync(project_dir, &lock, store)?;
 
-    let root_json = std::fs::read_to_string(project_dir.join("composer.json")).unwrap_or_else(|_| "{}".into());
+    let root_json = match std::fs::read_to_string(project_dir.join("composer.json")) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => "{}".to_string(),
+        Err(e) => return Err(CliError::Io(e)),
+    };
     compat_composer::generate(project_dir, &lock, store, &root_json)?;
 
     composer_bridge::run_script(runner, project_dir, "post-autoload-dump")?;
 
     let reg = gc::registry::Registry::new(&opts.registry_base);
-    reg.register(project_dir.to_str().unwrap_or_default())?;
+    let project_str = project_dir.to_str().ok_or_else(|| {
+        CliError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "project path is not valid UTF-8",
+        ))
+    })?;
+    reg.register(project_str)?;
 
     Ok(())
 }

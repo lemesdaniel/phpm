@@ -9,7 +9,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Materialize vendor/ from composer.lock (resolving first if the lock is missing)
+    /// Install from composer.lock. Resolves first only if the lock is missing; a STALE
+    /// lock (composer.json changed) is NOT re-resolved — run `phpm update` for that.
     Install,
 }
 

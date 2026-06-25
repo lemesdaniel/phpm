@@ -68,6 +68,22 @@ fn materialize_relinks_when_target_has_different_inode() {
 }
 
 #[test]
+fn materialize_prunes_files_absent_from_store() {
+    let src = TempDir::new().unwrap();
+    let dst_root = TempDir::new().unwrap();
+    fake_pkg(src.path()); // composer.json + src/A.php
+    let dst = dst_root.path().join("acme/pkg");
+    fs::create_dir_all(dst.join("src")).unwrap();
+    fs::write(dst.join("src/Old.php"), b"old").unwrap(); // stale, not in src
+    fs::write(dst.join("src/A.php"), b"x").unwrap();
+    fs::write(dst.join("composer.json"), b"x").unwrap();
+
+    materialize_package(src.path(), &dst, LinkMode::Copy).unwrap();
+    assert!(!dst.join("src/Old.php").exists(), "stale file pruned");
+    assert!(dst.join("src/A.php").exists());
+}
+
+#[test]
 fn materialize_copy_mode_duplicates_content() {
     let src = TempDir::new().unwrap();
     let dst_root = TempDir::new().unwrap();
@@ -185,7 +201,6 @@ fn pkg(name: &str, version: &str) -> lockfile::LockedPackage {
 }
 
 #[test]
-#[cfg(unix)]
 fn sync_materializes_lock_packages_from_store() {
     let store_dir = TempDir::new().unwrap();
     let project = TempDir::new().unwrap();
@@ -233,7 +248,6 @@ fn sync_is_no_op_when_sentinel_matches() {
 }
 
 #[test]
-#[cfg(unix)]
 fn sync_removes_stale_packages_not_in_lock() {
     let store_dir = TempDir::new().unwrap();
     let project = TempDir::new().unwrap();
@@ -263,7 +277,6 @@ fn sync_removes_stale_packages_not_in_lock() {
 }
 
 #[test]
-#[cfg(unix)]
 fn sync_includes_dev_packages() {
     let store_dir = TempDir::new().unwrap();
     let project = TempDir::new().unwrap();
@@ -278,4 +291,36 @@ fn sync_includes_dev_packages() {
     let report = sync(project.path(), &lock, &store).unwrap();
     assert_eq!(report.materialized, 1);
     assert!(project.path().join("vendor/phpunit/phpunit").exists());
+}
+
+#[test]
+fn sync_prunes_stale_files_on_version_upgrade() {
+    let store_dir = TempDir::new().unwrap();
+    let project = TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+    // v1 ships src/Old.php
+    {
+        let src = TempDir::new().unwrap();
+        fs::create_dir_all(src.path().join("src")).unwrap();
+        fs::write(src.path().join("composer.json"), b"{}").unwrap();
+        fs::write(src.path().join("src/Old.php"), b"old").unwrap();
+        let c = PackageCoords { vendor: "acme".into(), package: "pkg".into(), version: "1.0.0".into() };
+        store.write_package(&c, src.path()).unwrap();
+    }
+    // v2 drops Old.php, adds New.php
+    {
+        let src = TempDir::new().unwrap();
+        fs::create_dir_all(src.path().join("src")).unwrap();
+        fs::write(src.path().join("composer.json"), b"{}").unwrap();
+        fs::write(src.path().join("src/New.php"), b"new").unwrap();
+        let c = PackageCoords { vendor: "acme".into(), package: "pkg".into(), version: "2.0.0".into() };
+        store.write_package(&c, src.path()).unwrap();
+    }
+    let lock1 = ComposerLock { content_hash: "v1".into(), packages: vec![pkg("acme/pkg", "1.0.0")], packages_dev: vec![], plugin_api_version: String::new() };
+    sync(project.path(), &lock1, &store).unwrap();
+    assert!(project.path().join("vendor/acme/pkg/src/Old.php").exists());
+    let lock2 = ComposerLock { content_hash: "v2".into(), packages: vec![pkg("acme/pkg", "2.0.0")], packages_dev: vec![], plugin_api_version: String::new() };
+    sync(project.path(), &lock2, &store).unwrap();
+    assert!(!project.path().join("vendor/acme/pkg/src/Old.php").exists(), "stale v1 file pruned on upgrade");
+    assert!(project.path().join("vendor/acme/pkg/src/New.php").exists());
 }

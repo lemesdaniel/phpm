@@ -1,5 +1,7 @@
 # PHPM
 
+*[Read in English](README.md)*
+
 **Gerenciador de dependências PHP com store global compartilhado.** Uma camada de compatibilidade sobre o Composer, como o pnpm foi para o npm.
 
 PHPM não substitui o Composer. Ele reaproveita o `composer.json`, o `composer.lock` e o próprio solver do Composer, e troca a parte cara: em vez de cada projeto carregar seu próprio `vendor/` copiado byte a byte, o PHPM guarda cada `(pacote, versão)` **uma única vez** num store global e materializa o `vendor/` de cada projeto por **hard links arquivo-a-arquivo**.

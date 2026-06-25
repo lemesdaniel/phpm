@@ -78,6 +78,7 @@ fn install_end_to_end_offline() {
     let runner = RecordingRunner::default();
     let opts = InstallOpts {
         registry_base: registry_home.path().to_path_buf(),
+        no_dev: false,
     };
     install(project.path(), &store, &NoFetch, &runner, &opts).unwrap();
 
@@ -172,6 +173,7 @@ fn phpm_install_real_psr_log() {
     let fetcher = acquire::HttpFetcher::new().unwrap();
     let opts = InstallOpts {
         registry_base: registry.path().to_path_buf(),
+        no_dev: false,
     };
     install(project.path(), &store, &fetcher, &runner, &opts).unwrap();
 
@@ -198,4 +200,27 @@ fn gc_run_empty_registry_is_noop_not_error() {
     let report = gc_run(&store, registry_home.path(), true).unwrap();
     assert_eq!(report.would_remove, 0);
     assert_eq!(report.removed, 0);
+}
+
+#[test]
+fn install_no_dev_skips_dev_packages() {
+    let store_dir = tempfile::TempDir::new().unwrap();
+    let project = tempfile::TempDir::new().unwrap();
+    let registry_home = tempfile::TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+
+    seed_pkg(&store, project.path(), "acme", "greet", "1.0.0");       // prod
+    seed_pkg(&store, project.path(), "phpunit", "phpunit", "11.0.0"); // dev
+    fs::write(project.path().join("composer.json"), br#"{"name":"acme/app"}"#).unwrap();
+    fs::write(project.path().join("composer.lock"),
+        br#"{"content-hash":"h","packages":[{"name":"acme/greet","version":"1.0.0"}],"packages-dev":[{"name":"phpunit/phpunit","version":"11.0.0"}]}"#).unwrap();
+
+    let runner = RecordingRunner::default();
+    let opts = InstallOpts { registry_base: registry_home.path().to_path_buf(), no_dev: true };
+    install(project.path(), &store, &NoFetch, &runner, &opts).unwrap();
+
+    assert!(project.path().join("vendor/acme/greet/src/X.php").exists());
+    assert!(!project.path().join("vendor/phpunit/phpunit").exists(), "dev package must be absent with --no-dev");
+    let installed = fs::read_to_string(project.path().join("vendor/composer/installed.json")).unwrap();
+    assert!(!installed.contains("phpunit/phpunit"));
 }

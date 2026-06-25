@@ -26,6 +26,8 @@ pub enum CliError {
 pub struct InstallOpts {
     /// Base dir for the project registry (typically ~/.phpm).
     pub registry_base: PathBuf,
+    /// When true, packages_dev are excluded from acquire/link/generate.
+    pub no_dev: bool,
 }
 
 /// The install pipeline: acquire → link → generate → scripts → register.
@@ -43,7 +45,10 @@ pub fn install(
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Err(CliError::NoLock),
         Err(e) => return Err(CliError::Io(e)),
     };
-    let lock = lockfile::parse_lock(&lock_raw)?;
+    let mut lock = lockfile::parse_lock(&lock_raw)?;
+    if opts.no_dev {
+        lock.packages_dev.clear();
+    }
 
     for locked in lock.packages.iter().chain(lock.packages_dev.iter()) {
         acquire::acquire_package(store, fetcher, locked)?;

@@ -7,7 +7,11 @@ pub use crate::volume::LinkMode;
 
 /// Materialize the package tree at `store_pkg` into `dest` using `mode`.
 /// Returns the number of files newly linked/copied (already-correct hard links are skipped).
-pub fn materialize_package(store_pkg: &Path, dest: &Path, mode: LinkMode) -> Result<usize, LinkError> {
+pub fn materialize_package(
+    store_pkg: &Path,
+    dest: &Path,
+    mode: LinkMode,
+) -> Result<usize, LinkError> {
     let mut count = 0;
     for entry in WalkDir::new(store_pkg).follow_links(false) {
         let entry = entry.map_err(|e| LinkError::Io(std::io::Error::other(e)))?;

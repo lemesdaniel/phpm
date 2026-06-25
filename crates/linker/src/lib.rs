@@ -33,13 +33,20 @@ pub struct SyncReport {
 }
 
 /// Make `<project_dir>/vendor/` match `lock` exactly, materializing packages from `store`.
-pub fn sync(project_dir: &Path, lock: &ComposerLock, store: &Store) -> Result<SyncReport, LinkError> {
+pub fn sync(
+    project_dir: &Path,
+    lock: &ComposerLock,
+    store: &Store,
+) -> Result<SyncReport, LinkError> {
     let vendor = project_dir.join("vendor");
     std::fs::create_dir_all(&vendor)?;
 
     // Fast path: the sentinel records this exact lock → assume materialized, skip the walk.
     if read_sentinel(&vendor)?.as_deref() == Some(lock.content_hash.as_str()) {
-        return Ok(SyncReport { no_op: true, ..Default::default() });
+        return Ok(SyncReport {
+            no_op: true,
+            ..Default::default()
+        });
     }
 
     // Decide hard-link vs copy once. Different volumes can't share inodes → copy, losing dedup.

@@ -19,13 +19,17 @@ pub fn read_sentinel(vendor: &Path) -> Result<Option<String>, LinkError> {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(e) => return Err(LinkError::Io(e)),
     };
-    Ok(serde_json::from_str::<State>(&raw).ok().map(|s| s.content_hash))
+    Ok(serde_json::from_str::<State>(&raw)
+        .ok()
+        .map(|s| s.content_hash))
 }
 
 /// Write the lock content-hash as the completion marker. Must be the LAST step of sync,
 /// so the sentinel only exists once all links are materialized.
 pub fn write_sentinel(vendor: &Path, content_hash: &str) -> Result<(), LinkError> {
-    let state = State { content_hash: content_hash.to_string() };
+    let state = State {
+        content_hash: content_hash.to_string(),
+    };
     std::fs::write(vendor.join(SENTINEL), serde_json::to_vec(&state)?)?;
     Ok(())
 }

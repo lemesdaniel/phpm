@@ -30,9 +30,18 @@ fn materialize_hardlinks_files_sharing_inodes() {
     let n = materialize_package(src.path(), &dst, LinkMode::HardLink).unwrap();
     assert_eq!(n, 2, "two files materialized");
 
-    assert_eq!(fs::read(dst.join("composer.json")).unwrap(), b"{\"name\":\"acme/pkg\"}");
-    assert_eq!(fs::read(dst.join("src/A.php")).unwrap(), b"<?php class A {}");
-    assert_eq!(ino(&src.path().join("src/A.php")), ino(&dst.join("src/A.php")));
+    assert_eq!(
+        fs::read(dst.join("composer.json")).unwrap(),
+        b"{\"name\":\"acme/pkg\"}"
+    );
+    assert_eq!(
+        fs::read(dst.join("src/A.php")).unwrap(),
+        b"<?php class A {}"
+    );
+    assert_eq!(
+        ino(&src.path().join("src/A.php")),
+        ino(&dst.join("src/A.php"))
+    );
 }
 
 #[test]
@@ -63,8 +72,14 @@ fn materialize_relinks_when_target_has_different_inode() {
 
     let n = materialize_package(src.path(), &dst, LinkMode::HardLink).unwrap();
     assert_eq!(n, 2, "both files re-linked");
-    assert_eq!(ino(&src.path().join("src/A.php")), ino(&dst.join("src/A.php")));
-    assert_eq!(fs::read(dst.join("src/A.php")).unwrap(), b"<?php class A {}");
+    assert_eq!(
+        ino(&src.path().join("src/A.php")),
+        ino(&dst.join("src/A.php"))
+    );
+    assert_eq!(
+        fs::read(dst.join("src/A.php")).unwrap(),
+        b"<?php class A {}"
+    );
 }
 
 #[test]
@@ -92,7 +107,10 @@ fn materialize_copy_mode_duplicates_content() {
 
     let n = materialize_package(src.path(), &dst, LinkMode::Copy).unwrap();
     assert_eq!(n, 2);
-    assert_eq!(fs::read(dst.join("src/A.php")).unwrap(), b"<?php class A {}");
+    assert_eq!(
+        fs::read(dst.join("src/A.php")).unwrap(),
+        b"<?php class A {}"
+    );
 }
 
 #[test]
@@ -119,7 +137,11 @@ fn sentinel_round_trips_content_hash() {
     let vendor = project.path().join("vendor");
     std::fs::create_dir_all(&vendor).unwrap();
 
-    assert_eq!(read_sentinel(&vendor).unwrap(), None, "absent sentinel → None");
+    assert_eq!(
+        read_sentinel(&vendor).unwrap(),
+        None,
+        "absent sentinel → None"
+    );
 
     write_sentinel(&vendor, "abc123").unwrap();
     assert_eq!(read_sentinel(&vendor).unwrap().as_deref(), Some("abc123"));
@@ -219,7 +241,10 @@ fn sync_materializes_lock_packages_from_store() {
     assert!(!report.no_op);
 
     let vp = project.path().join("vendor/acme/pkg");
-    assert_eq!(std::fs::read(vp.join("src/A.php")).unwrap(), b"<?php class A {}");
+    assert_eq!(
+        std::fs::read(vp.join("src/A.php")).unwrap(),
+        b"<?php class A {}"
+    );
     assert_eq!(
         linker::sentinel::read_sentinel(&project.path().join("vendor"))
             .unwrap()
@@ -332,7 +357,10 @@ fn sync_recovers_after_partial_then_completes() {
     let report = sync(project.path(), &lock, &store).unwrap();
     assert!(!report.no_op);
     assert!(vendor.join("acme/pkg/src/A.php").exists());
-    assert_eq!(linker::sentinel::read_sentinel(&vendor).unwrap().as_deref(), Some("h1"));
+    assert_eq!(
+        linker::sentinel::read_sentinel(&vendor).unwrap().as_deref(),
+        Some("h1")
+    );
 }
 
 #[test]
@@ -346,7 +374,11 @@ fn sync_prunes_stale_files_on_version_upgrade() {
         fs::create_dir_all(src.path().join("src")).unwrap();
         fs::write(src.path().join("composer.json"), b"{}").unwrap();
         fs::write(src.path().join("src/Old.php"), b"old").unwrap();
-        let c = PackageCoords { vendor: "acme".into(), package: "pkg".into(), version: "1.0.0".into() };
+        let c = PackageCoords {
+            vendor: "acme".into(),
+            package: "pkg".into(),
+            version: "1.0.0".into(),
+        };
         store.write_package(&c, src.path()).unwrap();
     }
     // v2 drops Old.php, adds New.php
@@ -355,14 +387,31 @@ fn sync_prunes_stale_files_on_version_upgrade() {
         fs::create_dir_all(src.path().join("src")).unwrap();
         fs::write(src.path().join("composer.json"), b"{}").unwrap();
         fs::write(src.path().join("src/New.php"), b"new").unwrap();
-        let c = PackageCoords { vendor: "acme".into(), package: "pkg".into(), version: "2.0.0".into() };
+        let c = PackageCoords {
+            vendor: "acme".into(),
+            package: "pkg".into(),
+            version: "2.0.0".into(),
+        };
         store.write_package(&c, src.path()).unwrap();
     }
-    let lock1 = ComposerLock { content_hash: "v1".into(), packages: vec![pkg("acme/pkg", "1.0.0")], packages_dev: vec![], plugin_api_version: String::new() };
+    let lock1 = ComposerLock {
+        content_hash: "v1".into(),
+        packages: vec![pkg("acme/pkg", "1.0.0")],
+        packages_dev: vec![],
+        plugin_api_version: String::new(),
+    };
     sync(project.path(), &lock1, &store).unwrap();
     assert!(project.path().join("vendor/acme/pkg/src/Old.php").exists());
-    let lock2 = ComposerLock { content_hash: "v2".into(), packages: vec![pkg("acme/pkg", "2.0.0")], packages_dev: vec![], plugin_api_version: String::new() };
+    let lock2 = ComposerLock {
+        content_hash: "v2".into(),
+        packages: vec![pkg("acme/pkg", "2.0.0")],
+        packages_dev: vec![],
+        plugin_api_version: String::new(),
+    };
     sync(project.path(), &lock2, &store).unwrap();
-    assert!(!project.path().join("vendor/acme/pkg/src/Old.php").exists(), "stale v1 file pruned on upgrade");
+    assert!(
+        !project.path().join("vendor/acme/pkg/src/Old.php").exists(),
+        "stale v1 file pruned on upgrade"
+    );
     assert!(project.path().join("vendor/acme/pkg/src/New.php").exists());
 }

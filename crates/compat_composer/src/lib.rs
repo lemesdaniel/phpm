@@ -2,6 +2,8 @@
 //! Target is functional compatibility (classes load, InstalledVersions works), not
 //! byte-identical output: Composer embeds a per-project random hash in class names.
 
+pub mod aggregate;
+
 #[derive(Debug, thiserror::Error)]
 pub enum GenError {
     #[error("I/O: {0}")]

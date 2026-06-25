@@ -88,4 +88,9 @@ impl Store {
     pub(crate) fn root_ref(&self) -> &std::path::Path {
         &self.root
     }
+
+    /// Root path for volume comparison (hard links cannot cross filesystems).
+    pub fn root_for_volume_check(&self) -> &std::path::Path {
+        self.root_ref()
+    }
 }

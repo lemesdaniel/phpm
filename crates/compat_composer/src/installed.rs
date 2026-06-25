@@ -1,5 +1,4 @@
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
 
 /// One package's installed-state row.
 pub struct InstalledPackage {
@@ -97,35 +96,6 @@ fn render_version_row(
     s.push_str(&format!("            'dev_requirement' => {},\n", dev));
     s.push_str("        ),\n");
     s
-}
-
-/// Render `vendor/composer/installed.json` — the package array `package:discover` reads.
-/// `extras` maps package name → its composer.json `extra` value (Null if none).
-pub fn render_installed_json(
-    pkgs: &[InstalledPackage],
-    extras: &BTreeMap<String, Value>,
-) -> String {
-    let packages: Vec<Value> = pkgs
-        .iter()
-        .map(|p| {
-            json!({
-                "name": p.name,
-                "version": p.version,
-                "version_normalized": normalize_version(&p.version),
-                "type": p.package_type,
-                "dist": {
-                    "type": p.dist_type,
-                    "url": p.dist_url,
-                    "reference": p.reference,
-                    "shasum": p.shasum,
-                },
-                "extra": extras.get(&p.name).cloned().unwrap_or(Value::Null),
-            })
-        })
-        .collect();
-    let dev_names: Vec<&String> = pkgs.iter().filter(|p| p.dev).map(|p| &p.name).collect();
-    let doc = json!({ "packages": packages, "dev": true, "dev-package-names": dev_names });
-    serde_json::to_string_pretty(&doc).unwrap()
 }
 
 /// One package's row for installed.json, carrying its full composer.json so Composer's

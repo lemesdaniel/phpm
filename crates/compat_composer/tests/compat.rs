@@ -2,7 +2,7 @@ use compat_composer::aggregate::{aggregate_autoload, AutoloadData, PathBase};
 use compat_composer::bin_proxies::{render_bin_proxy_bat, render_bin_proxy_php};
 use compat_composer::classmap::{classmap_for_package, scan_php_classes};
 use compat_composer::generate;
-use compat_composer::installed::{render_installed_json, render_installed_php, InstalledPackage};
+use compat_composer::installed::{render_installed_php, InstalledPackage};
 use compat_composer::php_emit::{
     render_autoload_entry, render_autoload_real, render_classmap_php, render_files_php,
     render_psr4_php,
@@ -484,29 +484,30 @@ fn installed_php_dev_requirement_reflects_dev_flag() {
 
 #[test]
 fn installed_json_lists_dev_package_names() {
-    let pkgs = vec![
-        InstalledPackage {
+    use compat_composer::installed::{render_installed_json_full, InstalledEntry};
+    let entries = vec![
+        InstalledEntry {
             name: "monolog/monolog".into(),
             version: "3.8.1".into(),
-            package_type: "library".into(),
+            reference: "a".into(),
             dist_type: "zip".into(),
             dist_url: None,
-            reference: "a".into(),
             shasum: String::new(),
             dev: false,
+            composer_json: serde_json::json!({"name": "monolog/monolog"}),
         },
-        InstalledPackage {
+        InstalledEntry {
             name: "phpunit/phpunit".into(),
             version: "11.0.0".into(),
-            package_type: "library".into(),
+            reference: "b".into(),
             dist_type: "zip".into(),
             dist_url: None,
-            reference: "b".into(),
             shasum: String::new(),
             dev: true,
+            composer_json: serde_json::json!({"name": "phpunit/phpunit"}),
         },
     ];
-    let json = render_installed_json(&pkgs, &std::collections::BTreeMap::new());
+    let json = render_installed_json_full(&entries);
     let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(
         parsed["dev-package-names"],
@@ -530,13 +531,21 @@ fn installed_php_contains_root_and_versions() {
 
 #[test]
 fn installed_json_carries_extra_for_discovery() {
-    let pkgs = vec![pkg_row("acme/provider", "1.0.0")];
-    let mut extras: BTreeMap<String, serde_json::Value> = BTreeMap::new();
-    extras.insert(
-        "acme/provider".into(),
-        serde_json::json!({ "laravel": { "providers": ["Acme\\ServiceProvider"] } }),
-    );
-    let json = render_installed_json(&pkgs, &extras);
+    use compat_composer::installed::{render_installed_json_full, InstalledEntry};
+    let entries = vec![InstalledEntry {
+        name: "acme/provider".into(),
+        version: "1.0.0".into(),
+        reference: "ref".into(),
+        dist_type: "zip".into(),
+        dist_url: None,
+        shasum: String::new(),
+        dev: false,
+        composer_json: serde_json::json!({
+            "name": "acme/provider",
+            "extra": { "laravel": { "providers": ["Acme\\ServiceProvider"] } }
+        }),
+    }];
+    let json = render_installed_json_full(&entries);
     let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
     assert_eq!(parsed["packages"][0]["name"], "acme/provider");
     assert_eq!(parsed["packages"][0]["version"], "1.0.0");

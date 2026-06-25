@@ -4,7 +4,7 @@ Guidance for AI coding agents and contributors working in this repository.
 
 ## What this is
 
-PHPM is a PHP dependency manager written in Rust — a compatibility layer over Composer (pnpm-to-npm style). It reuses `composer.json`/`composer.lock` and Composer's solver, and replaces installation with a shared global store + file-by-file hard links into each project's `vendor/`. See `README-pt.md` for the user-facing overview and motivation.
+PHPM is a PHP dependency manager written in Rust: a compatibility layer over Composer (pnpm-to-npm style). It reuses `composer.json`/`composer.lock` and Composer's solver, and replaces installation with a shared global store + file-by-file hard links into each project's `vendor/`. See `README-pt.md` for the user-facing overview and motivation.
 
 ## Crate map (Cargo workspace, `crates/*`)
 
@@ -57,14 +57,14 @@ cargo test -p cli --test acceptance -- --ignored    # Laravel / Symfony / phpuni
 
 ## Not committed (gitignored)
 
-`/target`, `/RFC-*.md`, and `/docs/` are gitignored on purpose. The RFC, the implementation plans under `docs/superpowers/plans/`, and result artifacts are local — do not add them to git.
+`/target`, `/RFC-*.md`, and `/docs/` are gitignored on purpose. The RFC, the implementation plans under `docs/superpowers/plans/`, and result artifacts are local; do not add them to git.
 
 ## Key design decisions (context for changes)
 
 - Composer **never** writes to `vendor/`; it only resolves (`--no-install`) and runs scripts (`run-script`). PHPM owns the whole `vendor/`. Preserve this boundary.
 - Hard link **file-by-file** (not directory symlink) so `realpath()` resolves inside `vendor/`. Required for Laravel/Symfony compatibility.
 - `install` is an **idempotent sync**: it makes `vendor/` match the lock exactly. `require`/`remove`/`update` = mutate the lock via Composer, then run `install`.
-- The store is **read-only** and per-`(pkg,ver)` immutable — this is what makes shared hard links safe and the classmap cache sound.
+- The store is **read-only** and per-`(pkg,ver)` immutable; this is what makes shared hard links safe and the classmap cache sound.
 - Functional (not byte-identical) Composer compatibility: Composer embeds a per-project random hash in autoload class names, so byte-equality is impossible. Validate by running real PHP, not by diffing.
 
 ## Known limitations / backlog (don't "rediscover" these)

@@ -6,5 +6,5 @@ Quick reminders for Claude:
 
 - All four gates must pass before committing: `cargo build --workspace`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo fmt --all -- --check`.
 - Source comments and message strings are **English only**; keep only necessary comments.
-- `/RFC-*.md` and `/docs/` are gitignored — never add them to git.
+- `/RFC-*.md` and `/docs/` are gitignored; never add them to git.
 - Composer never touches `vendor/`; PHPM owns it. Don't break that boundary.

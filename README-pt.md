@@ -1,6 +1,6 @@
 # PHPM
 
-**Gerenciador de dependências PHP com store global compartilhado.** Uma camada de compatibilidade sobre o Composer — como o pnpm foi para o npm.
+**Gerenciador de dependências PHP com store global compartilhado.** Uma camada de compatibilidade sobre o Composer, como o pnpm foi para o npm.
 
 PHPM não substitui o Composer. Ele reaproveita o `composer.json`, o `composer.lock` e o próprio solver do Composer, e troca a parte cara: em vez de cada projeto carregar seu próprio `vendor/` copiado byte a byte, o PHPM guarda cada `(pacote, versão)` **uma única vez** num store global e materializa o `vendor/` de cada projeto por **hard links arquivo-a-arquivo**.
 
@@ -25,17 +25,17 @@ landing/vendor   400 MB
 total          ~1.8 GB
 ```
 
-A maior parte desses arquivos é **byte a byte idêntica** — `monolog/monolog 3.8.1`, os componentes `symfony/*`, `guzzlehttp/guzzle`, os pacotes PSR. Cada um aparece replicado em todo projeto que o usa.
+A maior parte desses arquivos é **byte a byte idêntica**: `monolog/monolog 3.8.1`, os componentes `symfony/*`, `guzzlehttp/guzzle`, os pacotes PSR. Cada um aparece replicado em todo projeto que o usa.
 
-O Composer tem cache de **download** (`~/.composer/cache`), o que evita re-baixar — mas **não** evita re-extrair nem a duplicação no disco materializado. Cada `composer install` extrai gigabytes repetidos.
+O Composer tem cache de **download** (`~/.composer/cache`), o que evita re-baixar, mas **não** evita re-extrair nem a duplicação no disco materializado. Cada `composer install` extrai gigabytes repetidos.
 
 PHPM armazena cada `(pacote, versão)` uma vez no store global e materializa o `vendor/` por hard link, que não consome espaço de dados adicional (só inodes de diretório). O resultado:
 
 - **Disco**: N projetos com os mesmos pacotes ocupam ~1 cópia, não N.
-- **Velocidade**: com o store quente, materializar o `vendor/` é hard link em segundos — sem download, sem extração.
+- **Velocidade**: com o store quente, materializar o `vendor/` é hard link em segundos, sem download e sem extração.
 - **Compatibilidade**: para o PHP, cada arquivo é indistinguível de uma cópia comum. `realpath()` resolve dentro do `vendor/` do projeto, não vaza para o store. Laravel e Symfony funcionam sem mudança.
 
-O ganho é mais nítido **onde há muitos projetos**: dev shops, monorepos separados, e principalmente **CI/fleets** — instalar 20 apps Laravel num runner hoje extrai gigabytes repetidos; com PHPM é uma fração do disco e do tempo.
+O ganho é mais nítido **onde há muitos projetos**: dev shops, monorepos separados, e principalmente **CI/fleets**. Instalar 20 apps Laravel num runner hoje extrai gigabytes repetidos; com PHPM é uma fração do disco e do tempo.
 
 ---
 
@@ -60,11 +60,11 @@ phpm install
                 (é aqui que o package:discover do Laravel registra os service providers)
 ```
 
-O Composer **nunca toca o `vendor/`** — ele só resolve (`--no-install`) e roda scripts. Toda a materialização é do PHPM. Essa fronteira é o que torna o ganho de velocidade real.
+O Composer **nunca toca o `vendor/`**: ele só resolve (`--no-install`) e roda scripts. Toda a materialização é do PHPM. Essa fronteira é o que torna o ganho de velocidade real.
 
 ### Decisão central: hard link arquivo-a-arquivo
 
-Hard link opera em **arquivos**, não em diretórios. Para cada pacote, o PHPM recria a árvore de diretórios em `vendor/` (custo desprezível — inodes vazios) e faz **cada arquivo** ser um hard link para o arquivo correspondente no store. O conteúdo — que é o que pesa — nunca é duplicado.
+Hard link opera em **arquivos**, não em diretórios. Para cada pacote, o PHPM recria a árvore de diretórios em `vendor/` (custo desprezível, só inodes vazios) e faz **cada arquivo** ser um hard link para o arquivo correspondente no store. O conteúdo, que é o que pesa, nunca é duplicado.
 
 Não usamos symlink de diretório (como o pnpm faz no Node) porque o PHP é sensível a `realpath()`: Laravel e Symfony chamam `realpath()` para descobrir config, views, migrations e service providers, e symlink de diretório faria isso vazar para o store. Hard link arquivo-a-arquivo é indistinguível de uma cópia para o PHP.
 
@@ -125,7 +125,7 @@ cp target/release/phpm /usr/local/bin/phpm   # ou outro dir no PATH
 
 ## Migrando um projeto Composer
 
-Não há migração — o PHPM lê os mesmos arquivos:
+Não há migração: o PHPM lê os mesmos arquivos:
 
 ```bash
 cd projeto-composer        # tem composer.json + composer.lock
@@ -158,17 +158,10 @@ Validado contra frameworks reais: **Laravel 13** (`artisan` sobe, package discov
 A v1 é, deliberadamente, um *acelerador de instalação + deduplicador de disco* construído sobre o Composer. Limitações conhecidas:
 
 - **Requer PHP + Composer instalados** (a v1 não tem solver próprio).
-- **`post-install-cmd` / `post-update-cmd` não são executados** — só `post-autoload-dump`. Em projeto novo, rode `php artisan key:generate` / `storage:link` manualmente uma vez.
+- **`post-install-cmd` / `post-update-cmd` não são executados**, só `post-autoload-dump`. Em projeto novo, rode `php artisan key:generate` / `storage:link` manualmente uma vez.
 - **`path` repositories** (pacotes locais) ainda não suportados.
 - **Plugins do Composer** não suportados.
 - **Pacotes que escrevem no próprio `vendor/`** (raros) falham alto por causa do store read-only.
-
-### Roadmap
-
-- **Beta**: instalação paralela, `phpm doctor`, detecção de pacotes auto-modificáveis, benchmarks reproduzíveis.
-- **Stable**: solver próprio em Rust (remove a dependência do Composer), Content-Addressable Storage (dedup no nível de arquivo entre versões), workspaces/monorepo, plugins.
-
-A substituição completa do Composer só se justifica depois de validada a adoção — é o que reduz o risco de gastar anos antes de saber se a ferramenta é desejada.
 
 ---
 

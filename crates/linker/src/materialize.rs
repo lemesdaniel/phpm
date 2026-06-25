@@ -50,6 +50,7 @@ pub fn materialize_package(
                 }
             }
             LinkMode::Copy => {
+                // no inode-skip in Copy mode; idempotency is gated by the sentinel at the sync level
                 fs::copy(entry.path(), &target)?;
             }
         }

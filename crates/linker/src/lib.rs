@@ -25,6 +25,7 @@ pub enum LinkError {
 }
 
 /// Outcome of a sync. `no_op` is true when the sentinel matched and nothing was touched.
+/// Carries counts only; M5 reconstructs per-package install/remove lines from a lock diff, not from this report.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct SyncReport {
     pub materialized: usize,
@@ -42,7 +43,10 @@ pub fn sync(
     std::fs::create_dir_all(&vendor)?;
 
     // Fast path: the sentinel records this exact lock → assume materialized, skip the walk.
-    if read_sentinel(&vendor)?.as_deref() == Some(lock.content_hash.as_str()) {
+    // An empty content_hash (lock missing it) is never trusted, else it would mask all changes.
+    if !lock.content_hash.is_empty()
+        && read_sentinel(&vendor)?.as_deref() == Some(lock.content_hash.as_str())
+    {
         return Ok(SyncReport {
             no_op: true,
             ..Default::default()
@@ -89,7 +93,9 @@ fn materialize_from_store(
     mode: LinkMode,
     report: &mut SyncReport,
 ) -> Result<(), LinkError> {
-    let _lock = store.lock_shared(coords)?; // shared: many projects may link the same package
+    // shared lock: many projects may link the same package
+    let _lock = store.lock_shared(coords)?;
+    // shared lock excludes a concurrent exclusive acquire, so has() is stable here
     if !store.has(coords) {
         return Err(LinkError::Io(std::io::Error::new(
             std::io::ErrorKind::NotFound,

@@ -254,7 +254,6 @@ fn sync_materializes_lock_packages_from_store() {
 }
 
 #[test]
-#[cfg(unix)]
 fn sync_is_no_op_when_sentinel_matches() {
     let store_dir = TempDir::new().unwrap();
     let project = TempDir::new().unwrap();
@@ -270,6 +269,28 @@ fn sync_is_no_op_when_sentinel_matches() {
     let report = sync(project.path(), &lock, &store).unwrap();
     assert!(report.no_op);
     assert_eq!(report.materialized, 0);
+}
+
+#[test]
+#[cfg(unix)]
+fn sync_empty_content_hash_never_no_ops() {
+    let store_dir = TempDir::new().unwrap();
+    let project = TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+    seed_store(&store, "acme", "pkg", "1.0.0");
+    let lock = ComposerLock {
+        content_hash: String::new(), // missing content-hash → must never short-circuit
+        packages: vec![pkg("acme/pkg", "1.0.0")],
+        packages_dev: vec![],
+        plugin_api_version: String::new(),
+    };
+    sync(project.path(), &lock, &store).unwrap();
+    // second run with an empty hash must NOT be a no_op (cannot trust the sentinel)
+    let report = sync(project.path(), &lock, &store).unwrap();
+    assert!(
+        !report.no_op,
+        "empty content_hash must not trigger the fast path"
+    );
 }
 
 #[test]

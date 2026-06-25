@@ -119,6 +119,24 @@ fn scan_finds_namespaced_classes_interfaces_traits_enums() {
 }
 
 #[test]
+fn scan_handles_chained_modifiers_and_readonly() {
+    let dir = tempfile::TempDir::new().unwrap();
+    fs::write(
+        dir.path().join("M.php"),
+        b"<?php\nnamespace Acme;\nfinal class Alpha {}\nabstract class Beta {}\nreadonly class Gamma {}\nfinal class Delta extends Base implements Iface {}\n",
+    ).unwrap();
+    let found = scan_php_classes(dir.path()).unwrap();
+    let mut names: Vec<&String> = found.keys().collect();
+    names.sort();
+    assert_eq!(names, vec![
+        &"Acme\\Alpha".to_string(),
+        &"Acme\\Beta".to_string(),
+        &"Acme\\Delta".to_string(),
+        &"Acme\\Gamma".to_string(),
+    ]);
+}
+
+#[test]
 fn scan_handles_global_namespace() {
     let dir = tempfile::TempDir::new().unwrap();
     fs::write(dir.path().join("Top.php"), b"<?php\nclass Top {}\n").unwrap();

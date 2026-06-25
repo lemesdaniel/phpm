@@ -9,6 +9,11 @@ use walkdir::WalkDir;
 /// line tokenizer covering the declaration forms Composer's classmap generator handles;
 /// PHP requires one namespace per file and top-level type declarations use fixed syntax,
 /// so a full parser is unnecessary here.
+///
+/// Known limitation: multi-line `/* ... */` block comments are not tracked, so a
+/// `class`/`interface`/`trait`/`enum` keyword appearing unindented on its own line
+/// inside a block comment would produce a spurious entry. Rare in real packages;
+/// accepted as a carry for this heuristic line-based tokenizer.
 pub fn scan_php_classes(root: &Path) -> Result<BTreeMap<String, String>, GenError> {
     let mut out = BTreeMap::new();
     for entry in WalkDir::new(root).follow_links(false) {

@@ -65,7 +65,12 @@ pub fn generate(
     let mut installed: Vec<InstalledPackage> = Vec::new();
     let mut extras: BTreeMap<String, serde_json::Value> = BTreeMap::new();
 
-    for locked in lock.packages.iter().chain(lock.packages_dev.iter()) {
+    for (locked, is_dev) in lock
+        .packages
+        .iter()
+        .map(|p| (p, false))
+        .chain(lock.packages_dev.iter().map(|p| (p, true)))
+    {
         let coords = match PackageCoords::from_name(&locked.name, &locked.version) {
             Some(c) => c,
             None => continue,
@@ -108,6 +113,7 @@ pub fn generate(
                 .map(|d| d.reference.clone())
                 .or_else(|| locked.source.as_ref().map(|s| s.reference.clone()))
                 .unwrap_or_default(),
+            dev: is_dev,
         });
     }
 

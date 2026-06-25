@@ -428,7 +428,30 @@ fn pkg_row(name: &str, ver: &str) -> InstalledPackage {
         version: ver.into(),
         package_type: "library".into(),
         reference: "abc123".into(),
+        dev: false,
     }
+}
+
+#[test]
+fn installed_php_dev_requirement_reflects_dev_flag() {
+    let pkgs = vec![
+        InstalledPackage { name: "monolog/monolog".into(), version: "3.8.1".into(), package_type: "library".into(), reference: "a".into(), dev: false },
+        InstalledPackage { name: "phpunit/phpunit".into(), version: "11.0.0".into(), package_type: "library".into(), reference: "b".into(), dev: true },
+    ];
+    let php = render_installed_php("acme/app", "1.0.0", &pkgs);
+    assert!(php.contains("'dev_requirement' => false,"));
+    assert!(php.contains("'dev_requirement' => true,"));
+}
+
+#[test]
+fn installed_json_lists_dev_package_names() {
+    let pkgs = vec![
+        InstalledPackage { name: "monolog/monolog".into(), version: "3.8.1".into(), package_type: "library".into(), reference: "a".into(), dev: false },
+        InstalledPackage { name: "phpunit/phpunit".into(), version: "11.0.0".into(), package_type: "library".into(), reference: "b".into(), dev: true },
+    ];
+    let json = render_installed_json(&pkgs, &std::collections::BTreeMap::new());
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(parsed["dev-package-names"], serde_json::json!(["phpunit/phpunit"]));
 }
 
 #[test]

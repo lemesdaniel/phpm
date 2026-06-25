@@ -162,7 +162,7 @@ A v1 é, deliberadamente, um *acelerador de instalação + deduplicador de disco
 - **Requer PHP + Composer instalados** (a v1 não tem solver próprio).
 - **`post-install-cmd` / `post-update-cmd` não são executados**, só `post-autoload-dump`. Em projeto novo, rode `php artisan key:generate` / `storage:link` manualmente uma vez.
 - **`path` repositories** (pacotes locais) ainda não suportados.
-- **Plugins do Composer** não suportados.
+- **Plugins de evento do Composer** (os que se conectam a eventos de script como `post-autoload-dump`) rodam via Composer quando o projeto os lista em `config.allow-plugins`. **Plugins instaladores** que mudam o caminho de instalação não são honrados, porque é o phpm (não o Composer) que materializa o `vendor/`.
 - **Pacotes que escrevem no próprio `vendor/`** (raros) falham alto por causa do store read-only.
 
 ---

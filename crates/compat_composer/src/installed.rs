@@ -1,5 +1,4 @@
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
 
 /// One package's installed-state row.
 pub struct InstalledPackage {
@@ -99,31 +98,58 @@ fn render_version_row(
     s
 }
 
-/// Render `vendor/composer/installed.json` — the package array `package:discover` reads.
-/// `extras` maps package name → its composer.json `extra` value (Null if none).
-pub fn render_installed_json(
-    pkgs: &[InstalledPackage],
-    extras: &BTreeMap<String, Value>,
-) -> String {
-    let packages: Vec<Value> = pkgs
+/// One package's row for installed.json, carrying its full composer.json so Composer's
+/// PluginManager sees require/autoload/type/extra unchanged.
+pub struct InstalledEntry {
+    pub name: String,
+    pub version: String,
+    pub reference: String,
+    pub dist_type: String,
+    pub dist_url: Option<String>,
+    pub shasum: String,
+    pub dev: bool,
+    /// The package's own composer.json, parsed. Used as the base object so require/autoload/
+    /// type/extra/provide/replace flow through to Composer's PluginManager unchanged.
+    pub composer_json: serde_json::Value,
+}
+
+/// Render `vendor/composer/installed.json` as a near-complete mirror of each package's own
+/// composer.json. Composer's PluginManager validates plugins against this (it needs the
+/// `require` block to find composer-plugin-api), so we start from the package's composer.json
+/// and only overlay the install-state fields.
+pub fn render_installed_json_full(entries: &[InstalledEntry]) -> String {
+    let packages: Vec<Value> = entries
         .iter()
-        .map(|p| {
-            json!({
-                "name": p.name,
-                "version": p.version,
-                "version_normalized": normalize_version(&p.version),
-                "type": p.package_type,
-                "dist": {
-                    "type": p.dist_type,
-                    "url": p.dist_url,
-                    "reference": p.reference,
-                    "shasum": p.shasum,
-                },
-                "extra": extras.get(&p.name).cloned().unwrap_or(Value::Null),
-            })
+        .map(|e| {
+            let mut obj = match &e.composer_json {
+                Value::Object(map) => map.clone(),
+                _ => serde_json::Map::new(),
+            };
+            obj.insert("name".into(), Value::String(e.name.clone()));
+            obj.insert("version".into(), Value::String(e.version.clone()));
+            obj.insert(
+                "version_normalized".into(),
+                Value::String(normalize_version(&e.version)),
+            );
+            obj.insert(
+                "dist".into(),
+                json!({
+                    "type": e.dist_type,
+                    "url": e.dist_url,
+                    "reference": e.reference,
+                    "shasum": e.shasum,
+                }),
+            );
+            obj.insert(
+                "install-path".into(),
+                Value::String(format!("../{}", e.name)),
+            );
+            obj.entry("type")
+                .or_insert_with(|| Value::String("library".into()));
+            Value::Object(obj)
         })
         .collect();
-    let dev_names: Vec<&String> = pkgs.iter().filter(|p| p.dev).map(|p| &p.name).collect();
+    let dev_names: Vec<&String> = entries.iter().filter(|e| e.dev).map(|e| &e.name).collect();
     let doc = json!({ "packages": packages, "dev": true, "dev-package-names": dev_names });
     serde_json::to_string_pretty(&doc).unwrap()
 }

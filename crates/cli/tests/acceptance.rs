@@ -117,6 +117,53 @@ fn symfony_console_runs_after_phpm_install() {
 
 #[test]
 #[ignore = "real: needs composer + php + network; run with --ignored"]
+fn project_with_event_plugin_installs_without_crash() {
+    assert!(have("composer") && have("php"), "needs composer + php");
+    let work = tempfile::TempDir::new().unwrap();
+    let project = work.path().join("app");
+    std::fs::create_dir_all(&project).unwrap();
+    // dealerdirect/phpcodesniffer-composer-installer is the event plugin that crashed phpm v1
+    // (PluginManager rejected it because installed.json lacked its require block). A declared
+    // post-autoload-dump script forces run_script to run, which boots Composer with plugins
+    // enabled and triggers plugin activation.
+    std::fs::write(
+        project.join("composer.json"),
+        br#"{
+          "name":"acme/app",
+          "require-dev":{"squizlabs/php_codesniffer":"^3.0","dealerdirect/phpcodesniffer-composer-installer":"^1.0"},
+          "scripts":{"post-autoload-dump":["@php -r \"echo 'phpm-hook-ran';\""]},
+          "config":{"allow-plugins":{"dealerdirect/phpcodesniffer-composer-installer":true}}
+        }"#,
+    )
+    .unwrap();
+
+    let runner = SystemRunner;
+    composer_bridge::update(&runner, &project).unwrap();
+    let store = Store::new(work.path().join("store"));
+    let fetcher = acquire::HttpFetcher::new().unwrap();
+    let opts = InstallOpts {
+        registry_base: work.path().join("registry"),
+        no_dev: false,
+    };
+    // Must NOT crash in PluginManager; this is the bug M7 fixes.
+    install(&project, &store, &fetcher, &runner, &opts).unwrap();
+
+    assert!(project.join("vendor/autoload.php").exists());
+    let phpcs = Command::new("php")
+        .arg("vendor/bin/phpcs")
+        .arg("--version")
+        .current_dir(&project)
+        .output()
+        .unwrap();
+    assert!(
+        phpcs.status.success(),
+        "vendor/bin/phpcs failed: {}",
+        String::from_utf8_lossy(&phpcs.stderr)
+    );
+}
+
+#[test]
+#[ignore = "real: needs composer + php + network; run with --ignored"]
 fn phpunit_bin_runs_after_phpm_install() {
     assert!(have("composer") && have("php"), "needs composer + php");
     let work = tempfile::TempDir::new().unwrap();

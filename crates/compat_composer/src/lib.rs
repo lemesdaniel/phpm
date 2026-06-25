@@ -9,7 +9,7 @@ pub mod installed;
 pub mod php_emit;
 
 use crate::aggregate::{aggregate_autoload, AutoloadData, PathBase};
-use crate::installed::InstalledPackage;
+use crate::installed::{InstalledEntry, InstalledPackage};
 use lockfile::ComposerLock;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -63,7 +63,7 @@ pub fn generate(
 
     let mut classmap: BTreeMap<String, String> = BTreeMap::new();
     let mut installed: Vec<InstalledPackage> = Vec::new();
-    let mut extras: BTreeMap<String, serde_json::Value> = BTreeMap::new();
+    let mut entries: Vec<InstalledEntry> = Vec::new();
 
     for (locked, is_dev) in lock
         .packages
@@ -78,6 +78,9 @@ pub fn generate(
         let pkg_dir = vendor.join(&coords.vendor).join(&coords.package);
         let prefix = format!("{}/{}", coords.vendor, coords.package);
 
+        // Capture the package's full composer.json so installed.json mirrors it. Null on any
+        // read/parse failure, so render_installed_json_full falls back to a minimal object.
+        let mut composer_json = serde_json::Value::Null;
         match std::fs::read_to_string(pkg_dir.join("composer.json")) {
             Ok(raw) => {
                 if let Ok(pj) = lockfile::parse_json(&raw) {
@@ -93,9 +96,7 @@ pub fn generate(
                     eprintln!("phpm: warning: {}/{} has an unparseable composer.json; its autoload was skipped", coords.vendor, coords.package);
                 }
                 if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
-                    if let Some(extra) = v.get("extra") {
-                        extras.insert(locked.name.clone(), extra.clone());
-                    }
+                    composer_json = v;
                 }
             }
             Err(_) => {
@@ -103,28 +104,43 @@ pub fn generate(
             }
         }
 
+        let dist_type = locked
+            .dist
+            .as_ref()
+            .map(|d| d.dist_type.clone())
+            .unwrap_or_default();
+        let dist_url = locked.dist.as_ref().and_then(|d| d.url.clone());
+        let reference = locked
+            .dist
+            .as_ref()
+            .map(|d| d.reference.clone())
+            .or_else(|| locked.source.as_ref().map(|s| s.reference.clone()))
+            .unwrap_or_default();
+        let shasum = locked
+            .dist
+            .as_ref()
+            .map(|d| d.shasum.clone())
+            .unwrap_or_default();
+
         installed.push(InstalledPackage {
             name: locked.name.clone(),
             version: locked.version.clone(),
             package_type: locked.package_type.clone(),
-            dist_type: locked
-                .dist
-                .as_ref()
-                .map(|d| d.dist_type.clone())
-                .unwrap_or_default(),
-            dist_url: locked.dist.as_ref().and_then(|d| d.url.clone()),
-            reference: locked
-                .dist
-                .as_ref()
-                .map(|d| d.reference.clone())
-                .or_else(|| locked.source.as_ref().map(|s| s.reference.clone()))
-                .unwrap_or_default(),
-            shasum: locked
-                .dist
-                .as_ref()
-                .map(|d| d.shasum.clone())
-                .unwrap_or_default(),
+            dist_type: dist_type.clone(),
+            dist_url: dist_url.clone(),
+            reference: reference.clone(),
+            shasum: shasum.clone(),
             dev: is_dev,
+        });
+        entries.push(InstalledEntry {
+            name: locked.name.clone(),
+            version: locked.version.clone(),
+            reference,
+            dist_type,
+            dist_url,
+            shasum,
+            dev: is_dev,
+            composer_json,
         });
     }
 
@@ -171,7 +187,7 @@ pub fn generate(
     )?;
     std::fs::write(
         composer_dir.join("installed.json"),
-        crate::installed::render_installed_json(&installed, &extras),
+        crate::installed::render_installed_json_full(&entries),
     )?;
 
     Ok(())

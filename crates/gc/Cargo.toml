@@ -1,0 +1,13 @@
+[package]
+name = "gc"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+lockfile = { path = "../lockfile" }
+store = { path = "../store" }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

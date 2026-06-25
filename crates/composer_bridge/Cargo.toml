@@ -1,0 +1,12 @@
+[package]
+name = "composer_bridge"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+lockfile = { path = "../lockfile" }
+
+[dev-dependencies]
+tempfile = { workspace = true }

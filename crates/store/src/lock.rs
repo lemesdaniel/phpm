@@ -45,6 +45,20 @@ impl Store {
         Ok(PackageLock { _file: file })
     }
 
+    /// Try the exclusive lock without blocking. Ok(None) if contended (a shared/exclusive
+    /// lock is held), Err on a real io failure. Used by gc to skip in-use packages.
+    pub fn try_lock_exclusive(
+        &self,
+        coords: &PackageCoords,
+    ) -> Result<Option<PackageLock>, StoreError> {
+        let file = self.open_lock_file(coords)?;
+        match FileExt::try_lock_exclusive(&file) {
+            Ok(true) => Ok(Some(PackageLock { _file: file })),
+            Ok(false) => Ok(None),
+            Err(e) => Err(StoreError::Io(e)),
+        }
+    }
+
     /// Tries to acquire the shared lock without blocking.
     /// Ok(None) = exclusive lock active (contention); Err = real I/O failure.
     pub fn try_lock_shared(

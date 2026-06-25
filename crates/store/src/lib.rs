@@ -106,15 +106,21 @@ impl Store {
         };
         for v in vendors {
             let v = v?;
-            if !v.file_type()?.is_dir() { continue; }
+            if !v.file_type()?.is_dir() {
+                continue;
+            }
             let vendor = v.file_name().to_string_lossy().into_owned();
             for p in std::fs::read_dir(v.path())? {
                 let p = p?;
-                if !p.file_type()?.is_dir() { continue; }
+                if !p.file_type()?.is_dir() {
+                    continue;
+                }
                 let package = p.file_name().to_string_lossy().into_owned();
                 for ver in std::fs::read_dir(p.path())? {
                     let ver = ver?;
-                    if !ver.file_type()?.is_dir() { continue; }
+                    if !ver.file_type()?.is_dir() {
+                        continue;
+                    }
                     out.push(PackageCoords {
                         vendor: vendor.clone(),
                         package: package.clone(),

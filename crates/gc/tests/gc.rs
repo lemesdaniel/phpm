@@ -1,8 +1,8 @@
 use gc::collect::{execute_gc, plan_gc, GcPlan};
 use gc::registry::Registry;
-use store::{PackageCoords, Store};
 use std::fs;
 use std::path::Path;
+use store::{PackageCoords, Store};
 use tempfile::TempDir;
 
 fn seed(store: &Store, v: &str, p: &str, ver: &str) {
@@ -12,7 +12,11 @@ fn seed(store: &Store, v: &str, p: &str, ver: &str) {
     fs::write(src.path().join("src/x.php"), b"<?php").unwrap();
     store
         .write_package(
-            &PackageCoords { vendor: v.into(), package: p.into(), version: ver.into() },
+            &PackageCoords {
+                vendor: v.into(),
+                package: p.into(),
+                version: ver.into(),
+            },
             src.path(),
         )
         .unwrap();
@@ -40,8 +44,7 @@ fn plan_gc_marks_unreferenced_for_removal() {
     let proj = TempDir::new().unwrap();
     write_lock(proj.path(), &[("monolog/monolog", "3.8.1")]);
 
-    let plan: GcPlan =
-        plan_gc(&store, &[proj.path().to_str().unwrap().to_string()]).unwrap();
+    let plan: GcPlan = plan_gc(&store, &[proj.path().to_str().unwrap().to_string()]).unwrap();
     assert_eq!(plan.to_remove.len(), 1);
     assert_eq!(plan.to_remove[0].vendor, "old");
     assert_eq!(plan.referenced_count, 1);
@@ -92,7 +95,10 @@ fn registry_registers_and_lists_unique_projects() {
     reg.register("/home/me/app-a").unwrap(); // dedup
     let mut got = reg.list().unwrap();
     got.sort();
-    assert_eq!(got, vec!["/home/me/app-a".to_string(), "/home/me/app-b".to_string()]);
+    assert_eq!(
+        got,
+        vec!["/home/me/app-a".to_string(), "/home/me/app-b".to_string()]
+    );
 }
 
 #[test]
@@ -122,7 +128,10 @@ fn plan_gc_aborts_on_malformed_lock() {
     let proj = TempDir::new().unwrap();
     fs::write(proj.path().join("composer.lock"), b"not json at all").unwrap();
     let result = plan_gc(&store, &[proj.path().to_str().unwrap().to_string()]);
-    assert!(result.is_err(), "malformed lock must abort, not silently over-delete");
+    assert!(
+        result.is_err(),
+        "malformed lock must abort, not silently over-delete"
+    );
 }
 
 #[test]

@@ -13,9 +13,16 @@ use std::process::Command;
 #[derive(Debug, thiserror::Error)]
 pub enum BridgeError {
     #[error("failed to run {program}: {source}")]
-    Spawn { program: String, source: std::io::Error },
+    Spawn {
+        program: String,
+        source: std::io::Error,
+    },
     #[error("{program} {args:?} failed: {stderr}")]
-    Failed { program: String, args: Vec<String>, stderr: String },
+    Failed {
+        program: String,
+        args: Vec<String>,
+        stderr: String,
+    },
     #[error("I/O: {0}")]
     Io(#[from] std::io::Error),
 }
@@ -34,7 +41,10 @@ impl Runner for SystemRunner {
             .args(args)
             .current_dir(cwd)
             .output()
-            .map_err(|source| BridgeError::Spawn { program: program.to_string(), source })?;
+            .map_err(|source| BridgeError::Spawn {
+                program: program.to_string(),
+                source,
+            })?;
         if !out.status.success() {
             return Err(BridgeError::Failed {
                 program: program.to_string(),

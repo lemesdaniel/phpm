@@ -49,12 +49,13 @@ pub fn plan_gc(store: &Store, project_dirs: &[String]) -> Result<GcPlan, GcError
     let to_remove = store
         .list_packages()?
         .into_iter()
-        .filter(|c| {
-            !referenced.contains(&(c.vendor.clone(), c.package.clone(), c.version.clone()))
-        })
+        .filter(|c| !referenced.contains(&(c.vendor.clone(), c.package.clone(), c.version.clone())))
         .collect();
 
-    Ok(GcPlan { to_remove, referenced_count: referenced.len() })
+    Ok(GcPlan {
+        to_remove,
+        referenced_count: referenced.len(),
+    })
 }
 
 /// Delete the planned packages. Each is removed only if its exclusive lock can be taken

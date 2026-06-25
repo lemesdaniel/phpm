@@ -17,5 +17,9 @@ pub fn run_script(runner: &dyn Runner, project_dir: &Path, event: &str) -> Resul
     if !declared {
         return Ok(());
     }
-    runner.run("composer", &["run-script", "--no-interaction", event], project_dir)
+    runner.run(
+        "composer",
+        &["run-script", "--no-interaction", event],
+        project_dir,
+    )
 }

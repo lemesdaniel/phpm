@@ -1,7 +1,11 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "phpm", version, about = "PHP dependency manager with a shared global store")]
+#[command(
+    name = "phpm",
+    version,
+    about = "PHP dependency manager with a shared global store"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -38,7 +42,9 @@ fn run(cli: Cli) -> Result<(), cli::install::CliError> {
     let store = store::Store::new(cli::store_dir());
     let fetcher = acquire::HttpFetcher::new()?;
     let runner = composer_bridge::SystemRunner;
-    let opts = cli::install::InstallOpts { registry_base: cli::registry_base() };
+    let opts = cli::install::InstallOpts {
+        registry_base: cli::registry_base(),
+    };
 
     match cli.command {
         Commands::Install => {
@@ -64,7 +70,10 @@ fn run(cli: Cli) -> Result<(), cli::install::CliError> {
             if prune {
                 println!("phpm: gc removed {} package(s)", report.removed);
             } else {
-                println!("phpm: gc would remove {} package(s) (run with --prune to delete)", report.would_remove);
+                println!(
+                    "phpm: gc would remove {} package(s) (run with --prune to delete)",
+                    report.would_remove
+                );
             }
         }
     }

@@ -11,7 +11,9 @@ pub struct Registry {
 
 impl Registry {
     pub fn new(base: &Path) -> Self {
-        Registry { file: base.join("projects") }
+        Registry {
+            file: base.join("projects"),
+        }
     }
 
     /// Add a project path (idempotent — deduped).
@@ -37,7 +39,11 @@ impl Registry {
 
     fn read_set(&self) -> Result<BTreeSet<String>, GcError> {
         match std::fs::read_to_string(&self.file) {
-            Ok(s) => Ok(s.lines().filter(|l| !l.trim().is_empty()).map(|l| l.to_string()).collect()),
+            Ok(s) => Ok(s
+                .lines()
+                .filter(|l| !l.trim().is_empty())
+                .map(|l| l.to_string())
+                .collect()),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(BTreeSet::new()),
             Err(e) => Err(GcError::Io(e)),
         }

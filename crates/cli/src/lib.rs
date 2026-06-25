@@ -32,16 +32,32 @@ pub struct GcReport {
 /// is a friendly no-op (reports 0), NOT an error — plan_gc's EmptyRegistry guard exists to
 /// stop an empty referenced set from nuking the store, but the CLI surfaces it as "nothing
 /// to do".
-pub fn gc_run(store: &Store, registry_base: &Path, prune: bool) -> Result<GcReport, install::CliError> {
+pub fn gc_run(
+    store: &Store,
+    registry_base: &Path,
+    prune: bool,
+) -> Result<GcReport, install::CliError> {
     let reg = gc::registry::Registry::new(registry_base);
     reg.prune_missing()?;
     let projects = reg.list()?;
     let plan = match gc::collect::plan_gc(store, &projects) {
         Ok(p) => p,
-        Err(gc::GcError::EmptyRegistry) => return Ok(GcReport { would_remove: 0, removed: 0 }),
+        Err(gc::GcError::EmptyRegistry) => {
+            return Ok(GcReport {
+                would_remove: 0,
+                removed: 0,
+            })
+        }
         Err(e) => return Err(install::CliError::Gc(e)),
     };
     let would_remove = plan.to_remove.len();
-    let removed = if prune { gc::collect::execute_gc(store, &plan)? } else { 0 };
-    Ok(GcReport { would_remove, removed })
+    let removed = if prune {
+        gc::collect::execute_gc(store, &plan)?
+    } else {
+        0
+    };
+    Ok(GcReport {
+        would_remove,
+        removed,
+    })
 }

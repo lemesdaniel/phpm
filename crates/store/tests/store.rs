@@ -120,14 +120,24 @@ fn try_lock_exclusive_some_when_free() {
 fn list_packages_enumerates_stored_coords() {
     let tmp = TempDir::new().unwrap();
     let store = Store::new(tmp.path());
-    store.write_package(&coords(), fake_source().path()).unwrap();
-    let other = PackageCoords { vendor: "psr".into(), package: "log".into(), version: "3.0.0".into() };
+    store
+        .write_package(&coords(), fake_source().path())
+        .unwrap();
+    let other = PackageCoords {
+        vendor: "psr".into(),
+        package: "log".into(),
+        version: "3.0.0".into(),
+    };
     store.write_package(&other, fake_source().path()).unwrap();
 
     let got = store.list_packages().unwrap();
     assert_eq!(got.len(), 2);
-    assert!(got.iter().any(|c| c.vendor == "monolog" && c.package == "monolog" && c.version == "3.8.1"));
-    assert!(got.iter().any(|c| c.vendor == "psr" && c.package == "log" && c.version == "3.0.0"));
+    assert!(got
+        .iter()
+        .any(|c| c.vendor == "monolog" && c.package == "monolog" && c.version == "3.8.1"));
+    assert!(got
+        .iter()
+        .any(|c| c.vendor == "psr" && c.package == "log" && c.version == "3.0.0"));
 }
 
 #[test]

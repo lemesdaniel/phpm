@@ -294,6 +294,48 @@ fn sync_includes_dev_packages() {
 }
 
 #[test]
+#[cfg(unix)]
+fn sync_errors_when_store_package_missing() {
+    let store_dir = TempDir::new().unwrap();
+    let project = TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+    // lock references a package that was never acquired into the store
+    let lock = ComposerLock {
+        content_hash: "hx".into(),
+        packages: vec![pkg("acme/missing", "1.0.0")],
+        packages_dev: vec![],
+        plugin_api_version: String::new(),
+    };
+    let err = sync(project.path(), &lock, &store).unwrap_err();
+    assert!(matches!(err, linker::LinkError::Io(_)));
+}
+
+#[test]
+#[cfg(unix)]
+fn sync_recovers_after_partial_then_completes() {
+    // A sentinel is only written on success, so an interrupted sync (no sentinel) re-runs fully.
+    let store_dir = TempDir::new().unwrap();
+    let project = TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+    seed_store(&store, "acme", "pkg", "1.0.0");
+    let lock = ComposerLock {
+        content_hash: "h1".into(),
+        packages: vec![pkg("acme/pkg", "1.0.0")],
+        packages_dev: vec![],
+        plugin_api_version: String::new(),
+    };
+    // simulate a half-built vendor with NO sentinel
+    let vendor = project.path().join("vendor");
+    std::fs::create_dir_all(vendor.join("acme/pkg")).unwrap();
+    assert_eq!(linker::sentinel::read_sentinel(&vendor).unwrap(), None);
+
+    let report = sync(project.path(), &lock, &store).unwrap();
+    assert!(!report.no_op);
+    assert!(vendor.join("acme/pkg/src/A.php").exists());
+    assert_eq!(linker::sentinel::read_sentinel(&vendor).unwrap().as_deref(), Some("h1"));
+}
+
+#[test]
 fn sync_prunes_stale_files_on_version_upgrade() {
     let store_dir = TempDir::new().unwrap();
     let project = TempDir::new().unwrap();

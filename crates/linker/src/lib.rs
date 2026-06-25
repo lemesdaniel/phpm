@@ -83,6 +83,15 @@ fn materialize_from_store(
     report: &mut SyncReport,
 ) -> Result<(), LinkError> {
     let _lock = store.lock_shared(coords)?; // shared: many projects may link the same package
+    if !store.has(coords) {
+        return Err(LinkError::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!(
+                "package {}/{}@{} not present in store",
+                coords.vendor, coords.package, coords.version
+            ),
+        )));
+    }
     let store_pkg = store.package_path(coords);
     let dest = vendor.join(&coords.vendor).join(&coords.package);
     let n = materialize_package(&store_pkg, &dest, mode)?;

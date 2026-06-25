@@ -17,9 +17,11 @@ pub fn run_script(runner: &dyn Runner, project_dir: &Path, event: &str) -> Resul
     if !declared {
         return Ok(());
     }
+    // --no-plugins: phpm does not support Composer plugins (v1 non-goal). Without it, the
+    // PluginManager bootstrap during run-script can reject a project's plugin and abort.
     runner.run(
         "composer",
-        &["run-script", "--no-interaction", event],
+        &["run-script", "--no-interaction", "--no-plugins", event],
         project_dir,
     )
 }

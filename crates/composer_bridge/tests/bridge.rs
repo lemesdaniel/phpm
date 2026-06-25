@@ -25,7 +25,13 @@ fn update_invokes_composer_update_no_install() {
     assert_eq!(calls[0].0, "composer");
     assert_eq!(
         calls[0].1,
-        vec!["update", "--no-install", "--no-scripts", "--no-interaction"]
+        vec![
+            "update",
+            "--no-install",
+            "--no-scripts",
+            "--no-plugins",
+            "--no-interaction"
+        ]
     );
 }
 
@@ -39,6 +45,7 @@ fn require_passes_packages_and_no_install() {
             "require",
             "--no-install",
             "--no-scripts",
+            "--no-plugins",
             "--no-interaction",
             "monolog/monolog:^3.0"
         ]
@@ -55,6 +62,7 @@ fn remove_passes_packages_and_no_install() {
             "remove",
             "--no-install",
             "--no-scripts",
+            "--no-plugins",
             "--no-interaction",
             "monolog/monolog"
         ]
@@ -75,7 +83,12 @@ fn run_script_runs_declared_event() {
     assert_eq!(calls[0].0, "composer");
     assert_eq!(
         calls[0].1,
-        vec!["run-script", "--no-interaction", "post-autoload-dump"]
+        vec![
+            "run-script",
+            "--no-interaction",
+            "--no-plugins",
+            "post-autoload-dump"
+        ]
     );
 }
 

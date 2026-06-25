@@ -81,10 +81,19 @@ pub fn install(
         lock.packages_dev.clear();
     }
 
-    for locked in lock.packages.iter().chain(lock.packages_dev.iter()) {
+    let packages: Vec<&lockfile::LockedPackage> = lock
+        .packages
+        .iter()
+        .chain(lock.packages_dev.iter())
+        .collect();
+    let total = packages.len();
+    eprintln!("phpm: installing {total} package(s)");
+    for (i, locked) in packages.iter().enumerate() {
+        eprintln!("  [{}/{}] {} {}", i + 1, total, locked.name, locked.version);
         acquire::acquire_package(store, fetcher, locked)?;
     }
 
+    eprintln!("phpm: linking vendor/");
     linker::sync(project_dir, &lock, store)?;
 
     let root_json = match std::fs::read_to_string(project_dir.join("composer.json")) {
@@ -92,8 +101,10 @@ pub fn install(
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => "{}".to_string(),
         Err(e) => return Err(CliError::Io(e)),
     };
+    eprintln!("phpm: generating autoload + installed state");
     compat_composer::generate(project_dir, &lock, store, &root_json)?;
 
+    eprintln!("phpm: running post-autoload-dump");
     composer_bridge::run_script(runner, project_dir, "post-autoload-dump")?;
 
     let reg = gc::registry::Registry::new(&opts.registry_base);
@@ -105,6 +116,7 @@ pub fn install(
     })?;
     reg.register(project_str)?;
 
+    eprintln!("phpm: done ({total} package(s))");
     Ok(InstallReport {
         lock_possibly_stale,
     })

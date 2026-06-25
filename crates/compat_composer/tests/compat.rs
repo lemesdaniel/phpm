@@ -4,9 +4,151 @@ use compat_composer::bin_proxies::{render_bin_proxy_php, render_bin_proxy_bat};
 use compat_composer::classmap::{classmap_for_package, scan_php_classes};
 use compat_composer::installed::{render_installed_php, render_installed_json, InstalledPackage};
 use compat_composer::php_emit::{render_psr4_php, render_files_php, render_classmap_php, render_autoload_real, render_autoload_entry};
-use lockfile::{Autoload, ComposerJson};
+use compat_composer::generate;
+use lockfile::{Autoload, ComposerJson, ComposerLock, LockedPackage};
+use store::{PackageCoords, Store};
 use std::collections::BTreeMap;
 use std::fs;
+use std::process::Command;
+
+fn php_available() -> bool {
+    Command::new("php").arg("--version").output().map(|o| o.status.success()).unwrap_or(false)
+}
+
+/// Seed the store + materialize a tiny PSR-4 package into vendor (M3 would do this).
+fn setup_greet(store: &Store, project: &std::path::Path) {
+    let body = b"<?php\nnamespace Acme\\Greet;\nclass Hello { public static function hi() { return 'hi'; } }\n";
+    let cj = br#"{"name":"acme/greet","autoload":{"psr-4":{"Acme\\Greet\\":"src/"}}}"#;
+    // store
+    let src = tempfile::TempDir::new().unwrap();
+    fs::create_dir_all(src.path().join("src")).unwrap();
+    fs::write(src.path().join("composer.json"), cj).unwrap();
+    fs::write(src.path().join("src/Hello.php"), body).unwrap();
+    let coords = PackageCoords { vendor: "acme".into(), package: "greet".into(), version: "1.0.0".into() };
+    store.write_package(&coords, src.path()).unwrap();
+    // materialize into vendor
+    let dest = project.join("vendor/acme/greet");
+    fs::create_dir_all(dest.join("src")).unwrap();
+    fs::write(dest.join("composer.json"), cj).unwrap();
+    fs::write(dest.join("src/Hello.php"), body).unwrap();
+}
+
+fn greet_lock() -> ComposerLock {
+    ComposerLock {
+        content_hash: "h1".into(),
+        packages: vec![LockedPackage {
+            name: "acme/greet".into(), version: "1.0.0".into(),
+            package_type: "library".into(), dist: None, source: None,
+        }],
+        packages_dev: vec![],
+        plugin_api_version: String::new(),
+    }
+}
+
+#[test]
+fn generate_writes_all_expected_files() {
+    let store_dir = tempfile::TempDir::new().unwrap();
+    let project = tempfile::TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+    setup_greet(&store, project.path());
+
+    generate(project.path(), &greet_lock(), &store, r#"{"name":"acme/app"}"#).unwrap();
+
+    let vendor = project.path().join("vendor");
+    for f in [
+        "autoload.php",
+        "composer/ClassLoader.php",
+        "composer/InstalledVersions.php",
+        "composer/autoload_real.php",
+        "composer/autoload_psr4.php",
+        "composer/autoload_namespaces.php",
+        "composer/autoload_classmap.php",
+        "composer/autoload_files.php",
+        "composer/installed.php",
+        "composer/installed.json",
+    ] {
+        assert!(vendor.join(f).exists(), "missing {f}");
+    }
+}
+
+#[test]
+fn generated_autoloader_loads_a_class() {
+    if !php_available() {
+        eprintln!("skipping: php not on PATH");
+        return;
+    }
+    let store_dir = tempfile::TempDir::new().unwrap();
+    let project = tempfile::TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+    setup_greet(&store, project.path());
+    generate(project.path(), &greet_lock(), &store, r#"{"name":"acme/app"}"#).unwrap();
+
+    let script = format!(
+        "require '{}/vendor/autoload.php'; echo \\Acme\\Greet\\Hello::hi();",
+        project.path().display()
+    );
+    let out = Command::new("php").arg("-r").arg(&script).output().unwrap();
+    assert!(out.status.success(), "php failed: {}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "hi");
+}
+
+#[test]
+fn generated_installed_versions_works() {
+    if !php_available() {
+        eprintln!("skipping: php not on PATH");
+        return;
+    }
+    let store_dir = tempfile::TempDir::new().unwrap();
+    let project = tempfile::TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+    setup_greet(&store, project.path());
+    generate(project.path(), &greet_lock(), &store, r#"{"name":"acme/app"}"#).unwrap();
+
+    // load autoload then query InstalledVersions for the dependency
+    let script = format!(
+        "require '{}/vendor/autoload.php'; echo \\Composer\\InstalledVersions::getPrettyVersion('acme/greet');",
+        project.path().display()
+    );
+    let out = Command::new("php").arg("-r").arg(&script).output().unwrap();
+    assert!(out.status.success(), "php failed: {}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "1.0.0");
+}
+
+#[test]
+#[cfg(unix)]
+fn generate_writes_executable_bin_proxy() {
+    use std::os::unix::fs::PermissionsExt;
+    let store_dir = tempfile::TempDir::new().unwrap();
+    let project = tempfile::TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+    // a package that declares a bin
+    let cj = br#"{"name":"acme/tool","bin":["bin/acmetool"],"autoload":{"psr-4":{"Acme\\Tool\\":"src/"}}}"#;
+    let src = tempfile::TempDir::new().unwrap();
+    fs::create_dir_all(src.path().join("bin")).unwrap();
+    fs::write(src.path().join("composer.json"), cj).unwrap();
+    fs::write(src.path().join("bin/acmetool"), b"<?php // tool\n").unwrap();
+    let coords = PackageCoords { vendor: "acme".into(), package: "tool".into(), version: "1.0.0".into() };
+    store.write_package(&coords, src.path()).unwrap();
+    let dest = project.path().join("vendor/acme/tool");
+    fs::create_dir_all(dest.join("bin")).unwrap();
+    fs::write(dest.join("composer.json"), cj).unwrap();
+    fs::write(dest.join("bin/acmetool"), b"<?php // tool\n").unwrap();
+
+    let lock = ComposerLock {
+        content_hash: "hb".into(),
+        packages: vec![LockedPackage {
+            name: "acme/tool".into(), version: "1.0.0".into(),
+            package_type: "library".into(), dist: None, source: None,
+        }],
+        packages_dev: vec![], plugin_api_version: String::new(),
+    };
+    generate(project.path(), &lock, &store, r#"{"name":"acme/app"}"#).unwrap();
+
+    let proxy = project.path().join("vendor/bin/acmetool");
+    assert!(proxy.exists(), "bin proxy created");
+    let mode = fs::metadata(&proxy).unwrap().permissions().mode();
+    assert_ne!(mode & 0o111, 0, "bin proxy must be executable");
+}
 
 #[test]
 fn gen_error_is_constructible() {

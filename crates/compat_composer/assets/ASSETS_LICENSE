@@ -1,0 +1,8 @@
+These two files are copied verbatim from composer/composer v2.9.5 (MIT License):
+- ClassLoader.php       (src/Composer/Autoload/ClassLoader.php)
+- InstalledVersions.php (src/Composer/InstalledVersions.php)
+
+Composer is (c) Nils Adermann, Jordi Boggiano and contributors, MIT License.
+Full license: https://github.com/composer/composer/blob/2.9.5/LICENSE
+
+PHPM copies them unmodified to generate a Composer-compatible vendor/ layout.

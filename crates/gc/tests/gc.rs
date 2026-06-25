@@ -113,3 +113,23 @@ fn registry_empty_when_never_registered() {
     let reg = Registry::new(home.path());
     assert!(reg.list().unwrap().is_empty());
 }
+
+#[test]
+fn plan_gc_aborts_on_malformed_lock() {
+    let store_dir = TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+    seed(&store, "a", "b", "1.0.0");
+    let proj = TempDir::new().unwrap();
+    fs::write(proj.path().join("composer.lock"), b"not json at all").unwrap();
+    let result = plan_gc(&store, &[proj.path().to_str().unwrap().to_string()]);
+    assert!(result.is_err(), "malformed lock must abort, not silently over-delete");
+}
+
+#[test]
+fn plan_gc_refuses_empty_registry() {
+    let store_dir = TempDir::new().unwrap();
+    let store = Store::new(store_dir.path());
+    seed(&store, "a", "b", "1.0.0");
+    let err = plan_gc(&store, &[]).unwrap_err();
+    assert!(matches!(err, gc::GcError::EmptyRegistry));
+}

@@ -12,4 +12,6 @@ pub enum GcError {
     Store(#[from] store::StoreError),
     #[error("lockfile: {0}")]
     Lock(#[from] lockfile::LockError),
+    #[error("no projects registered; refusing to plan gc (it would treat the entire store as garbage)")]
+    EmptyRegistry,
 }

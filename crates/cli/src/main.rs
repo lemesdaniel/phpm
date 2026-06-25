@@ -66,7 +66,10 @@ fn run(cli: Cli) -> Result<(), cli::install::CliError> {
             if !project_dir.join("composer.lock").exists() {
                 composer_bridge::update(&runner, &project_dir)?;
             }
-            cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;
+            let report = cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;
+            if report.lock_possibly_stale {
+                eprintln!("phpm: warning: composer.json requires packages not in composer.lock; run `phpm update` to re-resolve");
+            }
         }
         Commands::Require { packages, no_dev } => {
             let opts = cli::install::InstallOpts {
@@ -74,6 +77,7 @@ fn run(cli: Cli) -> Result<(), cli::install::CliError> {
                 no_dev,
             };
             composer_bridge::require(&runner, &project_dir, &packages)?;
+            // composer just re-resolved the lock, staleness is expected-resolved
             cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;
         }
         Commands::Remove { packages, no_dev } => {
@@ -82,6 +86,7 @@ fn run(cli: Cli) -> Result<(), cli::install::CliError> {
                 no_dev,
             };
             composer_bridge::remove(&runner, &project_dir, &packages)?;
+            // composer just re-resolved the lock, staleness is expected-resolved
             cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;
         }
         Commands::Update { no_dev } => {
@@ -90,6 +95,7 @@ fn run(cli: Cli) -> Result<(), cli::install::CliError> {
                 no_dev,
             };
             composer_bridge::update(&runner, &project_dir)?;
+            // composer just re-resolved the lock, staleness is expected-resolved
             cli::install::install(&project_dir, &store, &fetcher, &runner, &opts)?;
         }
         Commands::Gc { prune } => {

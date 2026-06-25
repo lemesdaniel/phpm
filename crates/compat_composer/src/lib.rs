@@ -3,6 +3,7 @@
 //! byte-identical output: Composer embeds a per-project random hash in class names.
 
 pub mod aggregate;
+pub mod bin_proxies;
 pub mod classmap;
 pub mod installed;
 pub mod php_emit;

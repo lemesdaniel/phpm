@@ -1,5 +1,6 @@
 use compat_composer::GenError;
 use compat_composer::aggregate::{aggregate_autoload, AutoloadData, PathBase};
+use compat_composer::bin_proxies::{render_bin_proxy_php, render_bin_proxy_bat};
 use compat_composer::classmap::{classmap_for_package, scan_php_classes};
 use compat_composer::installed::{render_installed_php, render_installed_json, InstalledPackage};
 use compat_composer::php_emit::{render_psr4_php, render_files_php, render_classmap_php, render_autoload_real, render_autoload_entry};
@@ -223,4 +224,19 @@ fn installed_json_carries_extra_for_discovery() {
     assert_eq!(parsed["packages"][0]["name"], "acme/provider");
     assert_eq!(parsed["packages"][0]["version"], "1.0.0");
     assert_eq!(parsed["packages"][0]["extra"]["laravel"]["providers"][0], "Acme\\ServiceProvider");
+}
+
+#[test]
+fn bin_proxy_php_resolves_autoload_and_includes_real_binary() {
+    let php = render_bin_proxy_php("phpunit/phpunit/phpunit");
+    assert!(php.starts_with("#!/usr/bin/env php\n<?php"));
+    assert!(php.contains("$_composer_autoload_path"));
+    assert!(php.contains("include __DIR__ . '/../phpunit/phpunit/phpunit';"));
+}
+
+#[test]
+fn bin_proxy_bat_calls_php() {
+    let bat = render_bin_proxy_bat("phpunit");
+    assert!(bat.contains("@php "));
+    assert!(bat.to_uppercase().contains("PHPUNIT"));
 }

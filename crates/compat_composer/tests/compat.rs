@@ -1,5 +1,6 @@
 use compat_composer::GenError;
 use compat_composer::aggregate::{aggregate_autoload, AutoloadData, PathBase};
+use compat_composer::php_emit::{render_psr4_php, render_files_php, render_classmap_php};
 use lockfile::{Autoload, ComposerJson};
 use std::collections::BTreeMap;
 
@@ -54,4 +55,34 @@ fn path_base_join_handles_empty_and_slashes() {
     assert_eq!(PathBase::Vendor.join(""), "$vendorDir");
     assert_eq!(PathBase::Base.join("/app/"), "$baseDir/app");
     assert_eq!(PathBase::Vendor.join("a/b"), "$vendorDir/a/b");
+}
+
+#[test]
+fn psr4_php_is_valid_array_with_base_vars() {
+    let mut psr4: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    psr4.insert("App\\".into(), vec![PathBase::Base.join("app")]);
+    psr4.insert("Monolog\\".into(), vec![PathBase::Vendor.join("monolog/monolog/src/Monolog")]);
+
+    let php = render_psr4_php(&psr4);
+    assert!(php.starts_with("<?php"));
+    assert!(php.contains("$vendorDir = dirname(__DIR__);"));
+    assert!(php.contains("$baseDir = dirname($vendorDir);"));
+    assert!(php.contains("'App\\\\' => array($baseDir . '/app'),"));
+    assert!(php.contains("'Monolog\\\\' => array($vendorDir . '/monolog/monolog/src/Monolog'),"));
+}
+
+#[test]
+fn files_php_keys_by_stable_identifier() {
+    let files = vec![PathBase::Vendor.join("acme/helpers/src/helpers.php")];
+    let php = render_files_php(&files);
+    assert!(php.starts_with("<?php"));
+    assert!(php.contains("=> $vendorDir . '/acme/helpers/src/helpers.php',"));
+}
+
+#[test]
+fn classmap_php_maps_class_to_path() {
+    let mut cm: BTreeMap<String, String> = BTreeMap::new();
+    cm.insert("Acme\\Greet\\Hello".into(), PathBase::Vendor.join("acme/greet/src/Hello.php"));
+    let php = render_classmap_php(&cm);
+    assert!(php.contains("'Acme\\\\Greet\\\\Hello' => $vendorDir . '/acme/greet/src/Hello.php',"));
 }

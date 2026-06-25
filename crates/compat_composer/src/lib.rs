@@ -3,6 +3,7 @@
 //! byte-identical output: Composer embeds a per-project random hash in class names.
 
 pub mod aggregate;
+pub mod php_emit;
 
 #[derive(Debug, thiserror::Error)]
 pub enum GenError {

@@ -108,6 +108,9 @@ pub struct InstalledEntry {
     pub dist_url: Option<String>,
     pub shasum: String,
     pub dev: bool,
+    /// The package's VCS source `{type, url, reference}`, if the lock recorded one. Composer
+    /// writes this alongside `dist`; mirroring it keeps `composer dump-autoload` happy.
+    pub source: Option<serde_json::Value>,
     /// The package's own composer.json, parsed. Used as the base object so require/autoload/
     /// type/extra/provide/replace flow through to Composer's PluginManager unchanged.
     pub composer_json: serde_json::Value,
@@ -140,6 +143,10 @@ pub fn render_installed_json_full(entries: &[InstalledEntry]) -> String {
                     "shasum": e.shasum,
                 }),
             );
+            if let Some(src) = &e.source {
+                obj.insert("source".into(), src.clone());
+            }
+            obj.insert("installation-source".into(), Value::String("dist".into()));
             obj.insert(
                 "install-path".into(),
                 Value::String(format!("../{}", e.name)),

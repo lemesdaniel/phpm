@@ -1,4 +1,4 @@
-use lockfile::ComposerJson;
+use lockfile::{Autoload, ComposerJson};
 use std::collections::BTreeMap;
 
 /// Which PHP base variable a path is anchored to in the generated files.
@@ -39,11 +39,31 @@ pub struct AutoloadData {
     pub classmap_dirs: Vec<String>,
 }
 
-/// Merge one package's autoload block into `data`. `pkg_prefix` is the vendor-relative
+/// Merge a package's `autoload` block into `data`. `pkg_prefix` is the vendor-relative
 /// "vendor/package" segment for dependencies, or None for the root package.
 pub fn aggregate_autoload(
     data: &mut AutoloadData,
     json: &ComposerJson,
+    base: PathBase,
+    pkg_prefix: Option<&str>,
+) {
+    merge_block(data, &json.autoload, base, pkg_prefix);
+}
+
+/// Merge a package's `autoload-dev` block into `data`. Composer only applies autoload-dev for
+/// the root package (and only outside `--no-dev`), so generate() calls this for the root alone.
+pub fn aggregate_autoload_dev(
+    data: &mut AutoloadData,
+    json: &ComposerJson,
+    base: PathBase,
+    pkg_prefix: Option<&str>,
+) {
+    merge_block(data, &json.autoload_dev, base, pkg_prefix);
+}
+
+fn merge_block(
+    data: &mut AutoloadData,
+    autoload: &Autoload,
     base: PathBase,
     pkg_prefix: Option<&str>,
 ) {
@@ -58,22 +78,22 @@ pub fn aggregate_autoload(
         }
     };
 
-    for (ns, dirs) in &json.autoload.psr4 {
+    for (ns, dirs) in &autoload.psr4 {
         let entry = data.psr4.entry(ns.clone()).or_default();
         for d in dirs {
             entry.push(base.join(&prefixed(d)));
         }
     }
-    for (ns, dirs) in &json.autoload.psr0 {
+    for (ns, dirs) in &autoload.psr0 {
         let entry = data.psr0.entry(ns.clone()).or_default();
         for d in dirs {
             entry.push(base.join(&prefixed(d)));
         }
     }
-    for f in &json.autoload.files {
+    for f in &autoload.files {
         data.files.push(base.join(&prefixed(f)));
     }
-    for c in &json.autoload.classmap {
+    for c in &autoload.classmap {
         data.classmap_dirs.push(base.join(&prefixed(c)));
     }
 }

@@ -8,7 +8,7 @@ pub mod classmap;
 pub mod installed;
 pub mod php_emit;
 
-use crate::aggregate::{aggregate_autoload, AutoloadData, PathBase};
+use crate::aggregate::{aggregate_autoload, aggregate_autoload_dev, AutoloadData, PathBase};
 use crate::installed::{InstalledEntry, InstalledPackage};
 use lockfile::ComposerLock;
 use std::collections::BTreeMap;
@@ -47,6 +47,7 @@ pub fn generate(
     lock: &ComposerLock,
     store: &Store,
     root_json: &str,
+    dev: bool,
 ) -> Result<(), GenError> {
     let vendor = project_dir.join("vendor");
     let composer_dir = vendor.join("composer");
@@ -56,10 +57,12 @@ pub fn generate(
     let root = lockfile::parse_json(root_json)?;
 
     let mut data = AutoloadData::default();
-    // TODO(M5): only root.autoload is aggregated, not root.autoload_dev. phpm currently installs
-    // dev packages too (packages_dev), so a dev-install mode should also aggregate root
-    // autoload-dev for test-runner namespaces.
+    // Composer applies autoload-dev only for the root package, and only outside --no-dev.
+    // Dependency autoload-dev is never aggregated.
     aggregate_autoload(&mut data, &root, PathBase::Base, None);
+    if dev {
+        aggregate_autoload_dev(&mut data, &root, PathBase::Base, None);
+    }
 
     let mut classmap: BTreeMap<String, String> = BTreeMap::new();
     let mut installed: Vec<InstalledPackage> = Vec::new();
@@ -121,6 +124,13 @@ pub fn generate(
             .as_ref()
             .map(|d| d.shasum.clone())
             .unwrap_or_default();
+        let source = locked.source.as_ref().map(|s| {
+            serde_json::json!({
+                "type": s.source_type,
+                "url": s.url,
+                "reference": s.reference,
+            })
+        });
 
         installed.push(InstalledPackage {
             name: locked.name.clone(),
@@ -140,6 +150,7 @@ pub fn generate(
             dist_url,
             shasum,
             dev: is_dev,
+            source,
             composer_json,
         });
     }

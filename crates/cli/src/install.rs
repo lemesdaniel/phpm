@@ -102,7 +102,7 @@ pub fn install(
         Err(e) => return Err(CliError::Io(e)),
     };
     eprintln!("phpm: generating autoload + installed state");
-    compat_composer::generate(project_dir, &lock, store, &root_json)?;
+    compat_composer::generate(project_dir, &lock, store, &root_json, !opts.no_dev)?;
 
     eprintln!("phpm: running post-autoload-dump");
     composer_bridge::run_script(runner, project_dir, "post-autoload-dump")?;

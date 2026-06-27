@@ -71,6 +71,7 @@ fn generate_writes_all_expected_files() {
         &greet_lock(),
         &store,
         r#"{"name":"acme/app"}"#,
+        true,
     )
     .unwrap();
 
@@ -106,6 +107,7 @@ fn generated_autoloader_loads_a_class() {
         &greet_lock(),
         &store,
         r#"{"name":"acme/app"}"#,
+        true,
     )
     .unwrap();
 
@@ -137,6 +139,7 @@ fn generated_installed_versions_works() {
         &greet_lock(),
         &store,
         r#"{"name":"acme/app"}"#,
+        true,
     )
     .unwrap();
 
@@ -190,7 +193,14 @@ fn generate_writes_executable_bin_proxy() {
         packages_dev: vec![],
         plugin_api_version: String::new(),
     };
-    generate(project.path(), &lock, &store, r#"{"name":"acme/app"}"#).unwrap();
+    generate(
+        project.path(),
+        &lock,
+        &store,
+        r#"{"name":"acme/app"}"#,
+        true,
+    )
+    .unwrap();
 
     let proxy = project.path().join("vendor/bin/acmetool");
     assert!(proxy.exists(), "bin proxy created");
@@ -240,6 +250,45 @@ fn aggregates_root_and_dependency_psr4_with_correct_base() {
     assert_eq!(
         data.psr4.get("Monolog\\").unwrap(),
         &vec![PathBase::Vendor.join("monolog/monolog/src/Monolog")]
+    );
+}
+
+#[test]
+fn root_autoload_dev_is_merged_separately_from_autoload() {
+    use compat_composer::aggregate::aggregate_autoload_dev;
+    let root = ComposerJson {
+        name: "acme/app".into(),
+        autoload: Autoload {
+            psr4: psr4(&[("App\\", "app/")]),
+            ..Default::default()
+        },
+        autoload_dev: Autoload {
+            psr4: psr4(&[("Tests\\", "tests/")]),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    // Dev off: only autoload, no Tests\.
+    let mut off = AutoloadData::default();
+    aggregate_autoload(&mut off, &root, PathBase::Base, None);
+    assert_eq!(
+        off.psr4.get("App\\").unwrap(),
+        &vec![PathBase::Base.join("app")]
+    );
+    assert!(!off.psr4.contains_key("Tests\\"));
+
+    // Dev on: autoload + autoload-dev, both anchored to $baseDir.
+    let mut on = AutoloadData::default();
+    aggregate_autoload(&mut on, &root, PathBase::Base, None);
+    aggregate_autoload_dev(&mut on, &root, PathBase::Base, None);
+    assert_eq!(
+        on.psr4.get("App\\").unwrap(),
+        &vec![PathBase::Base.join("app")]
+    );
+    assert_eq!(
+        on.psr4.get("Tests\\").unwrap(),
+        &vec![PathBase::Base.join("tests")]
     );
 }
 
@@ -494,6 +543,7 @@ fn installed_json_lists_dev_package_names() {
             dist_url: None,
             shasum: String::new(),
             dev: false,
+            source: None,
             composer_json: serde_json::json!({"name": "monolog/monolog"}),
         },
         InstalledEntry {
@@ -504,6 +554,7 @@ fn installed_json_lists_dev_package_names() {
             dist_url: None,
             shasum: String::new(),
             dev: true,
+            source: None,
             composer_json: serde_json::json!({"name": "phpunit/phpunit"}),
         },
     ];
@@ -540,6 +591,7 @@ fn installed_json_carries_extra_for_discovery() {
         dist_url: None,
         shasum: String::new(),
         dev: false,
+        source: None,
         composer_json: serde_json::json!({
             "name": "acme/provider",
             "extra": { "laravel": { "providers": ["Acme\\ServiceProvider"] } }
@@ -567,6 +619,7 @@ fn installed_json_preserves_require_and_autoload_for_plugin_validation() {
         dist_url: Some("https://x/y.zip".into()),
         shasum: String::new(),
         dev: false,
+        source: Some(serde_json::json!({"type":"git","url":"https://x/y.git","reference":"abc"})),
         composer_json: serde_json::from_str(raw).unwrap(),
     }];
     let json = render_installed_json_full(&entries);
@@ -580,6 +633,8 @@ fn installed_json_preserves_require_and_autoload_for_plugin_validation() {
     assert_eq!(p["version_normalized"], "1.2.3.0");
     assert_eq!(p["dist"]["type"], "zip");
     assert_eq!(p["dist"]["reference"], "abc");
+    assert_eq!(p["source"]["type"], "git");
+    assert_eq!(p["installation-source"], "dist");
     assert_eq!(p["install-path"], "../acme/plugin");
 }
 
@@ -595,6 +650,7 @@ fn installed_json_full_defaults_type_to_library_when_absent() {
         dist_url: None,
         shasum: String::new(),
         dev: false,
+        source: None,
         composer_json: serde_json::from_str(raw).unwrap(),
     }];
     let json = render_installed_json_full(&entries);
@@ -613,6 +669,7 @@ fn installed_json_full_handles_null_composer_json() {
         dist_url: None,
         shasum: String::new(),
         dev: false,
+        source: None,
         composer_json: serde_json::Value::Null,
     }];
     let json = render_installed_json_full(&entries);
@@ -662,7 +719,14 @@ fn generate_tolerates_missing_package_composer_json() {
         plugin_api_version: String::new(),
     };
     // must NOT error; the package is still recorded in installed
-    generate(project.path(), &lock, &store, r#"{"name":"acme/app"}"#).unwrap();
+    generate(
+        project.path(),
+        &lock,
+        &store,
+        r#"{"name":"acme/app"}"#,
+        true,
+    )
+    .unwrap();
     let installed =
         fs::read_to_string(project.path().join("vendor/composer/installed.json")).unwrap();
     assert!(installed.contains("acme/broken"));
